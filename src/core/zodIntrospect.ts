@@ -105,7 +105,8 @@ function buildStringSpec(
   meta?: FormMeta
 ): StringFieldSpec {
   // v4 note: string formats like email/url are distinct classes.
-  const isEmail = (z as any).ZodEmail && zodString instanceof (z as any).ZodEmail;
+  const isEmail =
+    (z as any).ZodEmail && zodString instanceof (z as any).ZodEmail;
   const isURL = (z as any).ZodURL && zodString instanceof (z as any).ZodURL;
 
   // Extract basic string constraints when available on plain strings
@@ -115,7 +116,11 @@ function buildStringSpec(
   let minLength: number | undefined;
   let maxLength: number | undefined;
   let pattern: string | undefined;
-  let format: StringFieldSpec["format"] = isEmail ? "email" : isURL ? "url" : "default";
+  let format: StringFieldSpec["format"] = isEmail
+    ? "email"
+    : isURL
+    ? "url"
+    : "default";
 
   for (const c of checks) {
     if (c.kind === "min") minLength = c.value ?? minLength;
@@ -157,7 +162,8 @@ function buildStringSpec(
     kind: "string",
     required,
     label: meta?.[name]?.label ?? humanizeKey(name),
-    description: meta?.[name]?.help ?? (zodString as any).description ?? description,
+    description:
+      meta?.[name]?.help ?? (zodString as any).description ?? description,
     defaultValue,
     minLength,
     maxLength,
@@ -318,7 +324,8 @@ export function zodObjectToFieldSpecs<T extends z.ZodRawShape>(
     // STRING and string formats (Zod v4)
     if (
       base instanceof z.ZodString ||
-      ((z as any).ZodStringFormat && base instanceof (z as any).ZodStringFormat) ||
+      ((z as any).ZodStringFormat &&
+        base instanceof (z as any).ZodStringFormat) ||
       ((z as any).ZodEmail && base instanceof (z as any).ZodEmail) ||
       ((z as any).ZodURL && base instanceof (z as any).ZodURL)
     ) {
