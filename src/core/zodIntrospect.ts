@@ -28,7 +28,7 @@ type UnwrapResult = {
   defaultValue?: unknown;
 };
 
-/** Peel wrappers: optional/nullable/default/effects/pipeline/catch */
+/** Peel wrappers: optional/nullable/default/pipe/catch/readonly */
 function unwrap(schema: z.ZodTypeAny): UnwrapResult {
   let s: z.ZodTypeAny = schema;
   let optional = false;
@@ -65,17 +65,29 @@ function unwrap(schema: z.ZodTypeAny): UnwrapResult {
       s = def.innerType;
       continue;
     }
-    // ZodPipeline (rare) – unwrap to OUT type
-    // @ts-expect-error def may exist in some Zod versions
-    if (s?.def?.typeName === "ZodPipeline") {
+    // ZodPipe (v4) – unwrap to OUT type
+    if ((z as any).ZodPipe && s instanceof (z as any).ZodPipe) {
+      // @ts-expect-error internal
+      s = s.def?.out ?? s;
+      continue;
+    }
+    // Legacy ZodPipeline guard by name (just in case)
+    // @ts-expect-error typeName is internal
+    if (s?.def?.typeName === "ZodPipeline" && s.def?.out) {
       // @ts-expect-error internal
       s = s.def.out;
       continue;
     }
     // ZodCatch – unwrap inner
-    if (s.constructor?.name === "ZodCatch") {
+    if ((z as any).ZodCatch && s instanceof (z as any).ZodCatch) {
       // @ts-expect-error internal
-      s = s.def.innerType;
+      s = s.def?.innerType ?? s;
+      continue;
+    }
+    // ZodReadonly – unwrap inner
+    if ((z as any).ZodReadonly && s instanceof (z as any).ZodReadonly) {
+      // @ts-expect-error internal
+      s = s.def?.innerType ?? s;
       continue;
     }
     break;
@@ -86,31 +98,29 @@ function unwrap(schema: z.ZodTypeAny): UnwrapResult {
 /** Extract ZodString info */
 function buildStringSpec(
   name: string,
-  zstr: z.ZodString,
+  zodString: z.ZodTypeAny,
   required: boolean,
   description?: string,
   defaultValue?: unknown,
   meta?: FormMeta
 ): StringFieldSpec {
-  // internal but widely used; checks: { kind: 'min'|'max'|'email'|'url'|'regex'|'datetime' ... }
-  const checks: Array<any> = zstr.def?.checks ?? [];
+  // v4 note: string formats like email/url are distinct classes.
+  const isEmail = (z as any).ZodEmail && zodString instanceof (z as any).ZodEmail;
+  const isURL = (z as any).ZodURL && zodString instanceof (z as any).ZodURL;
+
+  // Extract basic string constraints when available on plain strings
+  const checks: Array<{ kind: string; value?: any; regex?: RegExp }> =
+    (zodString as any).def?.checks ?? [];
+
   let minLength: number | undefined;
   let maxLength: number | undefined;
   let pattern: string | undefined;
-  let format: StringFieldSpec["format"] = "default";
+  let format: StringFieldSpec["format"] = isEmail ? "email" : isURL ? "url" : "default";
 
   for (const c of checks) {
     if (c.kind === "min") minLength = c.value ?? minLength;
     if (c.kind === "max") maxLength = c.value ?? maxLength;
     if (c.kind === "regex") pattern = c.regex?.source ?? pattern;
-    if (c.kind === "email") format = "email";
-    if (c.kind === "url") format = "url";
-    if (c.kind === "datetime") {
-      // Treat as date-like; the renderer can map format to a date input if desired.
-      // You can choose to convert this to kind: 'date' instead if you prefer.
-      // Here we keep it as string with implied format unless overridden via meta.widget.
-      // no-op here; leave format 'default' unless you want a special handling
-    }
   }
 
   // meta.widget can force a widget (e.g., password/textarea)
@@ -147,7 +157,7 @@ function buildStringSpec(
     kind: "string",
     required,
     label: meta?.[name]?.label ?? humanizeKey(name),
-    description: meta?.[name]?.help ?? zstr.description ?? description,
+    description: meta?.[name]?.help ?? (zodString as any).description ?? description,
     defaultValue,
     minLength,
     maxLength,
@@ -305,8 +315,13 @@ export function zodObjectToFieldSpecs<T extends z.ZodRawShape>(
     // enforce "simple" constraints
     assertFlatSupported(name, base);
 
-    // STRING
-    if (base instanceof z.ZodString) {
+    // STRING and string formats (Zod v4)
+    if (
+      base instanceof z.ZodString ||
+      ((z as any).ZodStringFormat && base instanceof (z as any).ZodStringFormat) ||
+      ((z as any).ZodEmail && base instanceof (z as any).ZodEmail) ||
+      ((z as any).ZodURL && base instanceof (z as any).ZodURL)
+    ) {
       fields.push(
         buildStringSpec(
           name,
@@ -386,8 +401,8 @@ export function zodObjectToFieldSpecs<T extends z.ZodRawShape>(
 
     // LITERAL -> single-option enum
     if (base instanceof z.ZodLiteral) {
-      // @ts-expect-error internal
-      const lit = base.def?.value;
+      // v4 exposes .def.value on literals; access via any
+      const lit = (base as any).def?.value;
       fields.push(
         buildEnumSpec(
           name,

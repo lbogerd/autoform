@@ -53,7 +53,7 @@ import type { FormMeta } from "@/core/types";
 
 const UserSchema = z.object({
   firstName: z.string().min(2).describe("Your given name"),
-  email: z.string().email(), // WARNING: z.string().email() deprecated, we'll change to the preferred z.email() soon
+  email: z.email(),
   age: z.number().min(13).default(18),
   newsletter: z.boolean().default(true),
   role: z.enum(["admin", "editor", "viewer"]).default("viewer"),
@@ -117,7 +117,7 @@ type FormMeta = {
 
 ## Supported Zod types (flat)
 
-* `z.string()` (+ `.min/.max/.regex/.email/.url`)
+* `z.string()` (+ `.min/.max/.regex`) and Zod v4 string formats: `z.email()`, `z.url()`
 * `z.number()` (+ `.min/.max/.multipleOf`, `int` respected via constraints)
 * `z.boolean()`
 * `z.enum([...])`, `z.nativeEnum(Enum)`

@@ -5,7 +5,7 @@ import { AutoForm } from "@/components/AutoForm";
 const UserSchema = z.object({
   firstName: z.string().min(2).describe("Your given name"),
   lastName: z.string().min(2),
-  email: z.string().email(),
+  email: z.email(),
   age: z.number().min(13).max(120).default(18),
   newsletter: z.boolean().default(true),
   birthday: z.date().optional(),
