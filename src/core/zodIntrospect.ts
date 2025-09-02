@@ -109,12 +109,10 @@ function buildStringSpec(
     (z as any).ZodEmail && zodString instanceof (z as any).ZodEmail;
   const isURL = (z as any).ZodURL && zodString instanceof (z as any).ZodURL;
 
-  // Extract basic string constraints when available on plain strings
-  const checks: Array<{ kind: string; value?: any; regex?: RegExp }> =
-    (zodString as any).def?.checks ?? [];
-
-  let minLength: number | undefined;
-  let maxLength: number | undefined;
+  // Extract string constraints
+  // Prefer public API on v4 (_ZodString exposes minLength/maxLength props)
+  let minLength: number | undefined = (zodString as any).minLength ?? undefined;
+  let maxLength: number | undefined = (zodString as any).maxLength ?? undefined;
   let pattern: string | undefined;
   let format: StringFieldSpec["format"] = isEmail
     ? "email"
@@ -122,10 +120,19 @@ function buildStringSpec(
     ? "url"
     : "default";
 
-  for (const c of checks) {
-    if (c.kind === "min") minLength = c.value ?? minLength;
-    if (c.kind === "max") maxLength = c.value ?? maxLength;
-    if (c.kind === "regex") pattern = c.regex?.source ?? pattern;
+  // Best-effort read of internals for regex/min/max (some builds expose checks)
+  const checks: Array<{ kind: string; value?: any; regex?: RegExp }> =
+    (zodString as any).def?.checks ?? [];
+  if (Array.isArray(checks) && checks.length) {
+    for (const c of checks) {
+      const inner = (c as any)._zod?.def;
+      // New v4 checks use { check: 'min_length'|'max_length'|'string_format', ... }
+      if (inner?.check === "min_length") minLength = inner.minimum ?? minLength;
+      if (inner?.check === "max_length") maxLength = inner.maximum ?? maxLength;
+      if (inner?.check === "string_format" && inner?.format === "regex") {
+        pattern = inner.pattern?.source ?? pattern;
+      }
+    }
   }
 
   // meta.widget can force a widget (e.g., password/textarea)
@@ -182,15 +189,20 @@ function buildNumberSpec(
   meta?: FormMeta
 ): NumberFieldSpec {
   // internal checks: { kind: 'min'|'max'|'multipleOf'|'int' ... }
-  const checks: Array<any> = znum.def?.checks ?? [];
+  const checks: Array<any> = (znum as any).def?.checks ?? [];
   let min: number | undefined;
   let max: number | undefined;
   let step: number | undefined;
 
   for (const c of checks) {
-    if (c.kind === "min") min = c.value ?? min;
-    if (c.kind === "max") max = c.value ?? max;
-    if (c.kind === "multipleOf") step = c.value ?? step;
+    const inner = (c as any)._zod?.def;
+    if (inner?.check === "greater_than") min = inner.value ?? min;
+    if (inner?.check === "less_than") max = inner.value ?? max;
+    if (inner?.check === "multiple_of") step = inner.value ?? step;
+    // Legacy guard
+    if ((c as any).kind === "min") min = (c as any).value ?? min;
+    if ((c as any).kind === "max") max = (c as any).value ?? max;
+    if ((c as any).kind === "multipleOf") step = (c as any).value ?? step;
   }
 
   return {
@@ -216,13 +228,17 @@ function buildDateSpec(
   meta?: FormMeta
 ): DateFieldSpec {
   // internal checks: { kind: 'min'|'max', value: Date }
-  const checks: Array<any> = zdate.def?.checks ?? [];
+  const checks: Array<any> = (zdate as any).def?.checks ?? [];
   let min: Date | undefined;
   let max: Date | undefined;
 
   for (const c of checks) {
-    if (c.kind === "min") min = c.value ?? min;
-    if (c.kind === "max") max = c.value ?? max;
+    const inner = (c as any)._zod?.def;
+    if (inner?.check === "greater_than") min = inner.value ?? min;
+    if (inner?.check === "less_than") max = inner.value ?? max;
+    // Legacy guard
+    if ((c as any).kind === "min") min = (c as any).value ?? min;
+    if ((c as any).kind === "max") max = (c as any).value ?? max;
   }
 
   return {
@@ -408,8 +424,12 @@ export function zodObjectToFieldSpecs<T extends z.ZodRawShape>(
 
     // LITERAL -> single-option enum
     if (base instanceof z.ZodLiteral) {
-      // v4 exposes .def.value on literals; access via any
-      const lit = (base as any).def?.value;
+      // v4 literal stores values in def.values (Set or Array)
+      const values = (base as any).def?.values ?? (base as any)._def?.values;
+      const lit = Array.isArray(values)
+        ? values[0]
+        : values?.values?.next?.().value ??
+          values?.[Symbol.iterator]?.().next?.().value;
       fields.push(
         buildEnumSpec(
           name,
