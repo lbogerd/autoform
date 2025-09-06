@@ -25,20 +25,20 @@ function unwrap(schema: z.ZodTypeAny): UnwrapResult {
 
   // unwrap defaults first so we still know optionality afterwards
   if (current instanceof z.ZodDefault) {
-    defaultValue = (current as any)._def.defaultValue();
-    current = (current as any)._def.innerType;
+    defaultValue = current._zod.def.defaultValue;
+    current = current._zod.def.innerType as z.ZodAny;
     required = false; // has a default
   }
 
   // optional
   if (current instanceof z.ZodOptional) {
     required = false;
-    current = (current as any)._def.innerType;
+    current = current._zod.def.innerType as z.ZodAny;
   }
 
   // nullable doesn't affect required from a form perspective – still required unless optional/default.
   if (current instanceof z.ZodNullable) {
-    current = (current as any)._def.innerType;
+    current = current._zod.def.innerType as z.ZodAny;
   }
 
   return { schema: current, required, defaultValue };
@@ -55,7 +55,7 @@ export function introspectProperty(
 
   // STRING -------------------------------------------------------------
   if (unwrapped instanceof z.ZodString) {
-    const checks: any[] = (unwrapped as any)._def.checks || [];
+    const checks: any[] = unwrapped._zod.def.checks || [];
     const spec: StringFieldSpec = {
       kind: "string",
       name,
@@ -64,22 +64,44 @@ export function introspectProperty(
       format: "default",
     };
     for (const c of checks) {
-      switch (c.kind) {
-        case "min":
-          spec.minLength = c.value;
+      // Zod v3 exposed string checks with a simple { kind, value } shape.
+      // Zod v4 (as of 4.1.x) wraps checks in classes whose .def carries metadata.
+      // We attempt to read both shapes defensively so this code works across versions.
+      const kind = c.kind || c.def?.format || c.def?.check;
+      switch (kind) {
+        case "min": // v3 style
+        case "min_length": // v4 internal check id
+          if (c.value !== undefined) spec.minLength = c.value;
+          else if (typeof c.def?.minLength === "number")
+            spec.minLength = c.def.minLength;
           break;
         case "max":
-          spec.maxLength = c.value;
+        case "max_length":
+          if (c.value !== undefined) spec.maxLength = c.value;
+          else if (typeof c.def?.maxLength === "number")
+            spec.maxLength = c.def.maxLength;
           break;
-        case "email":
+        case "email": // v3 provided kind
           spec.format = "email";
           break;
         case "url":
           spec.format = "url";
           break;
+        case "string_format":
+          // v4 uses check: 'string_format' alongside def.format specifying which
+          if (c.def?.format === "email") spec.format = "email";
+          else if (c.def?.format === "url") spec.format = "url";
+          break;
         case "regex":
           spec.pattern = c.regex?.source;
           break;
+        default:
+          // As a final fallback, if the check object exposes def.format directly (v4) and we
+          // haven't captured a more specific case yet, map known formats.
+          if (spec.format === "default" && c.def?.format) {
+            if (c.def.format === "email") spec.format = "email";
+            else if (c.def.format === "url") spec.format = "url";
+          }
       }
     }
     return spec;
@@ -87,7 +109,7 @@ export function introspectProperty(
 
   // NUMBER -------------------------------------------------------------
   if (unwrapped instanceof z.ZodNumber) {
-    const checks: any[] = (unwrapped as any)._def.checks || [];
+    const checks: any[] = unwrapped._zod.def.checks || [];
     const spec: NumberFieldSpec = {
       kind: "number",
       name,
@@ -95,15 +117,34 @@ export function introspectProperty(
       defaultValue,
     };
     for (const c of checks) {
-      switch (c.kind) {
+      // Zod v3 used { kind, value }. Zod v4 uses opaque classes; we infer from constructor names.
+      const innerDef = c._zod?.def || c.def; // v4 nested def
+      const kind =
+        c.kind || innerDef?.check || c.def?.check || c.constructor?.name;
+      switch (kind) {
         case "min":
-          spec.min = c.value;
+        case "greater_than":
+        case "$ZodCheckGreaterThan":
+        case "ZodCheckGreaterThan":
+          if (c.value !== undefined) spec.min = c.value;
+          else if (typeof innerDef?.min === "number") spec.min = innerDef.min;
+          else if (typeof innerDef?.value === "number")
+            spec.min = innerDef.value;
           break;
         case "max":
-          spec.max = c.value;
+        case "less_than":
+        case "$ZodCheckLessThan":
+        case "ZodCheckLessThan":
+          if (c.value !== undefined) spec.max = c.value;
+          else if (typeof innerDef?.max === "number") spec.max = innerDef.max;
+          else if (typeof innerDef?.value === "number")
+            spec.max = innerDef.value;
           break;
         case "multipleOf":
-          spec.step = c.value;
+        case "multiple_of":
+          if (c.value !== undefined) spec.step = c.value;
+          else if (typeof innerDef?.value === "number")
+            spec.step = innerDef.value;
           break;
       }
     }
@@ -134,7 +175,7 @@ export function introspectProperty(
 
   // ENUM / LITERAL UNION ----------------------------------------------
   if (unwrapped instanceof z.ZodEnum) {
-    const values: string[] = (unwrapped as any).options as string[];
+    const values: string[] = unwrapped.options as string[];
     const spec: EnumFieldSpec = {
       kind: "enum",
       name,
@@ -145,24 +186,21 @@ export function introspectProperty(
     return spec;
   }
 
-  // native enum: we approximate by reading _def.values (runtime shape subject to change across versions)
-  if ((unwrapped as any)?._def?.typeName === "ZodNativeEnum") {
-    const enumObj = (unwrapped as any)._def.values as Record<
+  // native enum: we approximate by reading _zod.def.values (runtime shape subject to change across versions)
+  if (unwrapped?._zod.def?.type === "enum") {
+    const enumObj = (unwrapped._zod.def as any).values as Record<
       string,
       string | number
     >;
-    const entries = Object.entries(enumObj).filter(
-      ([, v]) => typeof v === "string" || typeof v === "number"
-    );
+    const values = Object.values(enumObj).filter(
+      (v) => typeof v === "string" || typeof v === "number"
+    ) as (string | number)[];
     const spec: EnumFieldSpec = {
       kind: "enum",
       name,
       required,
       defaultValue,
-      options: entries.map(([label, value]) => ({
-        label,
-        value: value as string | number,
-      })),
+      options: values.map((v) => ({ label: String(v), value: v })),
     };
     return spec;
   }
@@ -171,10 +209,10 @@ export function introspectProperty(
   if (unwrapped instanceof z.ZodUnion) {
     const options: { label: string; value: string | number }[] = [];
     let allLiterals = true;
-    const inner = (unwrapped as any)._def.options as z.ZodTypeAny[];
+    const inner = (unwrapped._zod.def as any).options as z.ZodTypeAny[];
     for (const opt of inner) {
-      if ((opt as any)?._def?.typeName === "ZodLiteral") {
-        const value = (opt as any)._def.value as string | number;
+      if (opt?._zod.def?.type === "literal") {
+        const value = (opt._zod.def as any).options as string | number;
         options.push({ label: String(value), value });
       } else {
         allLiterals = false;
@@ -205,7 +243,7 @@ export function introspectObjectSchema<Z extends z.ZodRawShape>(
   const shape = objectSchema.shape;
   const result: Record<string, FieldSpec> = {};
   for (const key of Object.keys(shape)) {
-    const spec = introspectProperty(key, (shape as any)[key]);
+    const spec = introspectProperty(key, shape[key] as z.ZodAny);
     if (spec) result[key] = spec;
   }
   return result;
