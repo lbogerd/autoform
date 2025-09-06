@@ -9,6 +9,7 @@ import type {
   BooleanFieldSpec,
   DateFieldSpec,
 } from "./types";
+import type { ZodTypeDef } from "zod/v3";
 
 /** Humanize a key like "firstName" -> "First name" */
 function humanizeKey(key: string): string {
@@ -29,7 +30,7 @@ type UnwrapResult = {
 };
 
 /** Peel wrappers: optional/nullable/default/pipe/catch/readonly */
-function unwrap(schema: z.ZodTypeAny): UnwrapResult {
+function unwrap(schema: ZodTypeDef): UnwrapResult {
   let s: z.ZodTypeAny = schema;
   let optional = false;
   let nullable = false;
