@@ -10,6 +10,7 @@ import {
 import * as z from "zod";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -211,8 +212,15 @@ function NumberField({ spec, placeholder, register, error }: FieldPropsBase) {
   );
 }
 
-function BooleanField({ spec, control, error }: FieldPropsBase) {
-  // Prefer Switch; render as controlled boolean
+function BooleanField({
+  spec,
+  control,
+  error,
+  meta,
+}: FieldPropsBase & { meta?: FormMeta }) {
+  const widget = meta?.[spec.name]?.widget;
+  const useCheckbox = widget === "checkbox";
+
   return (
     <Controller
       name={spec.name}
@@ -243,12 +251,21 @@ function BooleanField({ spec, control, error }: FieldPropsBase) {
                 </p>
               )}
             </div>
-            <Switch
-              id={fieldId(spec.name)}
-              checked={!!field.value}
-              onCheckedChange={field.onChange}
-              aria-invalid={!!error}
-            />
+            {useCheckbox ? (
+              <Checkbox
+                id={fieldId(spec.name)}
+                checked={!!field.value}
+                onCheckedChange={field.onChange}
+                aria-invalid={!!error}
+              />
+            ) : (
+              <Switch
+                id={fieldId(spec.name)}
+                checked={!!field.value}
+                onCheckedChange={field.onChange}
+                aria-invalid={!!error}
+              />
+            )}
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
@@ -718,6 +735,7 @@ export function AutoForm<TSchema extends z.ZodObject<any>>({
             register={register}
             control={control}
             error={err}
+            meta={meta}
           />
         )}
         {spec.kind === "enum" && (

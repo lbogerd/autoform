@@ -51,6 +51,10 @@ const ComplexUserSchema = z.object({
     .boolean()
     .default(false)
     .describe("Subscribe to our newsletter"),
+  marketingEmails: z
+    .boolean()
+    .default(false)
+    .describe("Receive marketing emails"),
 
   // Date field
   birthDate: z
@@ -175,7 +179,7 @@ const ComplexUserMetaSchema: FormMeta = {
     order: 8,
   },
   agreeToTerms: {
-    widget: "switch",
+    widget: "checkbox",
     width: "full",
     order: 15,
   },
@@ -183,6 +187,11 @@ const ComplexUserMetaSchema: FormMeta = {
     widget: "switch",
     width: "full",
     order: 16,
+  },
+  marketingEmails: {
+    widget: "checkbox",
+    width: "full",
+    order: 17,
   },
   birthDate: {
     width: "half",
