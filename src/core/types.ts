@@ -83,7 +83,17 @@ export type FormMeta = {
     help?: string;
     order?: number;
     width?: "full" | "half" | "auto";
-    widget?: "select" | "radio" | "checkbox" | "switch" | "number" | "date";
+    widget?:
+      | "select"
+      | "radio"
+      | "checkbox"
+      | "switch"
+      | "number"
+      | "date"
+      | "password"
+      | "textarea"
+      | "email"
+      | "url";
     options?: { label: string; value: string | number }[]; // override enum labels
   };
 };

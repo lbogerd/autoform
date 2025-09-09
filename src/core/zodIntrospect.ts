@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// this file contains a lot of `any` due to Zod internals being used
+// `any`s are therefore unavoidable
+
 // core/zodIntrospect.ts
 import * as z from "zod";
 import type {
@@ -16,7 +20,7 @@ import type {
 function humanizeKey(key: string): string {
   return key
     .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/[_\-]+/g, " ")
+    .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
     .replace(/^./, (c) => c.toUpperCase());
