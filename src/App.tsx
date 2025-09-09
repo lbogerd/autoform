@@ -1,15 +1,41 @@
+import { AutoForm } from "@/components/AutoForm";
 import * as z from "zod";
 import type { FormMeta } from "./core/types";
-import { AutoForm } from "@/components/AutoForm";
 
 const UserSchema = z.object({
-  firstName: z.string().min(2).describe("Your given name"),
-  lastName: z.string().min(2),
-  email: z.email(),
-  age: z.number().min(13).max(120).default(18),
-  newsletter: z.boolean().default(true),
-  birthday: z.date().optional(),
-  role: z.enum(["admin", "editor", "viewer"]).default("viewer"),
+  firstName: z
+    .string()
+    .min(2)
+    .describe("Your given name")
+    .meta({ widget: "text" }),
+  lastName: z
+    .string()
+    .min(2)
+    .describe("Your family name")
+    .meta({ widget: "text" }),
+  email: z.email().describe("Your email address").meta({ widget: "text" }),
+  age: z
+    .number()
+    .min(13)
+    .max(120)
+    .default(18)
+    .describe("Your age")
+    .meta({ widget: "number" }),
+  newsletter: z
+    .boolean()
+    .default(true)
+    .describe("Subscribe to newsletter")
+    .meta({ widget: "checkbox" }),
+  birthday: z
+    .date()
+    .optional()
+    .describe("Your birth date")
+    .meta({ widget: "date" }),
+  role: z
+    .enum(["admin", "editor", "viewer"])
+    .default("viewer")
+    .describe("Your role")
+    .meta({ widget: "select" }),
 });
 
 const meta: FormMeta = {

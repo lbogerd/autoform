@@ -120,10 +120,12 @@ describe("zodObjectToFieldSpecs (Zod v4)", () => {
   });
 
   it("throws on unsupported complex types", () => {
-    const WithNested = z.object({ nested: z.object({ x: z.string() }) });
-    const WithArray = z.object({ a: z.array(z.string()) });
+    const WithTuple = z.object({ coords: z.tuple([z.number(), z.number()]) });
+    const WithRecord = z.object({ mapping: z.record(z.string(), z.string()) });
+    const WithMap = z.object({ cache: z.map(z.string(), z.number()) });
 
-    expect(() => zodObjectToFieldSpecs(WithNested)).toThrow(/nested objects/);
-    expect(() => zodObjectToFieldSpecs(WithArray)).toThrow(/arrays/);
+    expect(() => zodObjectToFieldSpecs(WithTuple)).toThrow(/tuples are not supported/);
+    expect(() => zodObjectToFieldSpecs(WithRecord)).toThrow(/records are not supported/);
+    expect(() => zodObjectToFieldSpecs(WithMap)).toThrow(/maps\/sets are not supported/);
   });
 });

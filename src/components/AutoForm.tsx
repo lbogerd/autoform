@@ -1,14 +1,18 @@
 // components/AutoForm.tsx
-import * as React from "react";
-import * as z from "zod";
-import { useForm, Controller, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import * as React from "react";
+import {
+  Controller,
+  useFieldArray,
+  useForm,
+  type FieldErrors,
+} from "react-hook-form";
+import * as z from "zod";
 
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -16,7 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 
 import type { FieldSpec, FormMeta } from "@/core/types";
 import { zodObjectToFieldSpecs } from "@/core/zodIntrospect";
@@ -79,6 +84,15 @@ function buildDefaultValuesFromFields(fields: FieldSpec[]) {
             ? new Date(f.defaultValue as any)
             : f.defaultValue
           : f.defaultValue;
+    } else if (f.kind === "object") {
+      // For object fields, recursively build default values
+      const objectSpec = f as any;
+      if (objectSpec.fields) {
+        acc[f.name] = buildDefaultValuesFromFields(objectSpec.fields);
+      }
+    } else if (f.kind === "array") {
+      // For array fields, initialize as empty array
+      acc[f.name] = [];
     }
   }
   return acc;
@@ -411,6 +425,202 @@ function DateField({ spec, control, error }: FieldPropsBase) {
   );
 }
 
+function ObjectField({
+  spec,
+  control,
+  error,
+  meta,
+}: FieldPropsBase & { meta?: FormMeta }) {
+  const objectSpec = spec as any; // ObjectFieldSpec
+
+  return (
+    <div className="space-y-4">
+      <Label className="text-base font-medium">
+        {spec.label ?? spec.name}
+        {spec.required && <span className="text-red-500 ml-1">*</span>}
+      </Label>
+      {spec.description && (
+        <p className="text-xs text-muted-foreground">{spec.description}</p>
+      )}
+
+      <div className="border rounded-lg p-4 space-y-4">
+        {objectSpec.fields?.map((field: FieldSpec) => (
+          <div key={field.name}>
+            {renderFieldInternal(
+              field,
+              control,
+              () => ({}),
+              meta,
+              `${spec.name}.${field.name}`
+            )}
+          </div>
+        ))}
+      </div>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+function ArrayField({
+  spec,
+  control,
+  error,
+  meta,
+}: FieldPropsBase & { meta?: FormMeta }) {
+  const arraySpec = spec as any; // ArrayFieldSpec
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: spec.name,
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Label className="text-base font-medium">
+          {spec.label ?? spec.name}
+          {spec.required && <span className="text-red-500 ml-1">*</span>}
+        </Label>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => append({})}
+        >
+          Add Item
+        </Button>
+      </div>
+
+      {spec.description && (
+        <p className="text-xs text-muted-foreground">{spec.description}</p>
+      )}
+
+      <div className="space-y-3">
+        {fields.map((field, index) => (
+          <div key={field.id} className="border rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-medium">Item {index + 1}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => remove(index)}
+              >
+                Remove
+              </Button>
+            </div>
+            {renderFieldInternal(
+              arraySpec.elementSpec,
+              control,
+              () => ({}),
+              meta,
+              `${spec.name}.${index}`
+            )}
+          </div>
+        ))}
+      </div>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+function UnionField({
+  spec,
+  control,
+  error,
+  meta,
+}: FieldPropsBase & { meta?: FormMeta }) {
+  const unionSpec = spec as any; // UnionFieldSpec
+  const [selectedOption, setSelectedOption] = React.useState<number>(0);
+
+  return (
+    <div className="space-y-4">
+      <Label className="text-base font-medium">
+        {spec.label ?? spec.name}
+        {spec.required && <span className="text-red-500 ml-1">*</span>}
+      </Label>
+
+      {spec.description && (
+        <p className="text-xs text-muted-foreground">{spec.description}</p>
+      )}
+
+      <div className="space-y-3">
+        <Select
+          value={selectedOption.toString()}
+          onValueChange={(value) => setSelectedOption(parseInt(value, 10))}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select type..." />
+          </SelectTrigger>
+          <SelectContent>
+            {unionSpec.options?.map((option: FieldSpec, index: number) => (
+              <SelectItem key={index} value={index.toString()}>
+                {option.label ?? option.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {unionSpec.options?.[selectedOption] && (
+          <div className="border rounded-lg p-4">
+            {renderFieldInternal(
+              unionSpec.options[selectedOption],
+              control,
+              () => ({}),
+              meta,
+              spec.name
+            )}
+          </div>
+        )}
+      </div>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+// Helper function to render fields recursively
+function renderFieldInternal(
+  spec: FieldSpec,
+  control: any,
+  register: any,
+  meta?: FormMeta,
+  nameOverride?: string,
+  error?: string
+): React.ReactNode {
+  const fieldName = nameOverride ?? spec.name;
+  const fieldError = error; // You might need to handle nested errors differently
+
+  const commonProps = {
+    spec: { ...spec, name: fieldName },
+    control,
+    register,
+    error: fieldError,
+  };
+
+  switch (spec.kind) {
+    case "string":
+      return <StringField {...commonProps} />;
+    case "number":
+      return <NumberField {...commonProps} />;
+    case "boolean":
+      return <BooleanField {...commonProps} />;
+    case "enum":
+      return <EnumField {...commonProps} meta={meta} />;
+    case "date":
+      return <DateField {...commonProps} />;
+    case "object":
+      return <ObjectField {...commonProps} meta={meta} />;
+    case "array":
+      return <ArrayField {...commonProps} meta={meta} />;
+    case "union":
+      return <UnionField {...commonProps} meta={meta} />;
+    default:
+      return <div>Unsupported field type: {(spec as any).kind}</div>;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -526,6 +736,33 @@ export function AutoForm<TSchema extends z.ZodObject<any>>({
             register={register}
             control={control}
             error={err}
+          />
+        )}
+        {spec.kind === "object" && (
+          <ObjectField
+            spec={spec}
+            register={register}
+            control={control}
+            error={err}
+            meta={meta}
+          />
+        )}
+        {spec.kind === "array" && (
+          <ArrayField
+            spec={spec}
+            register={register}
+            control={control}
+            error={err}
+            meta={meta}
+          />
+        )}
+        {spec.kind === "union" && (
+          <UnionField
+            spec={spec}
+            register={register}
+            control={control}
+            error={err}
+            meta={meta}
           />
         )}
       </div>

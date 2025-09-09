@@ -1,5 +1,13 @@
 // core/types.ts
-export type FieldKind = "string" | "number" | "boolean" | "enum" | "date";
+export type FieldKind =
+  | "string"
+  | "number"
+  | "boolean"
+  | "enum"
+  | "date"
+  | "object"
+  | "array"
+  | "union";
 
 export type BaseFieldSpec = {
   name: string;
@@ -40,12 +48,33 @@ export type DateFieldSpec = BaseFieldSpec & {
   max?: string | Date;
 };
 
+export type ObjectFieldSpec = BaseFieldSpec & {
+  kind: "object";
+  fields: FieldSpec[];
+};
+
+export type ArrayFieldSpec = BaseFieldSpec & {
+  kind: "array";
+  elementSpec: FieldSpec;
+  minItems?: number;
+  maxItems?: number;
+};
+
+export type UnionFieldSpec = BaseFieldSpec & {
+  kind: "union";
+  options: FieldSpec[];
+  discriminatorKey?: string; // For discriminated unions
+};
+
 export type FieldSpec =
   | StringFieldSpec
   | NumberFieldSpec
   | EnumFieldSpec
   | BooleanFieldSpec
-  | DateFieldSpec;
+  | DateFieldSpec
+  | ObjectFieldSpec
+  | ArrayFieldSpec
+  | UnionFieldSpec;
 
 export type FormMeta = {
   [field: string]: {

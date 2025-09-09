@@ -1,13 +1,15 @@
 // core/zodIntrospect.ts
 import * as z from "zod";
 import type {
+  ArrayFieldSpec,
+  DateFieldSpec,
+  EnumFieldSpec,
   FieldSpec,
   FormMeta,
-  StringFieldSpec,
   NumberFieldSpec,
-  EnumFieldSpec,
-  BooleanFieldSpec,
-  DateFieldSpec,
+  ObjectFieldSpec,
+  StringFieldSpec,
+  UnionFieldSpec,
 } from "./types";
 
 /** Humanize a key like "firstName" -> "First name" */
@@ -36,7 +38,6 @@ function unwrap(schema: z.ZodTypeAny): UnwrapResult {
   let hasDefault = false;
   let defaultValue: unknown = undefined;
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     if (s instanceof z.ZodOptional) {
       optional = true;
@@ -281,32 +282,280 @@ function buildEnumSpec(
   };
 }
 
-/** Guard against unsupported nested/complex types for this "simple" scope */
-function assertFlatSupported(name: string, t: z.ZodTypeAny) {
-  if (t instanceof z.ZodArray)
-    throw new Error(
-      `Field "${name}": arrays are not supported in simple forms.`
+/** Build Object spec */
+function buildObjectSpec(
+  name: string,
+  zobject: z.ZodObject<any>,
+  required: boolean,
+  description?: string,
+  defaultValue?: unknown,
+  meta?: FormMeta
+): ObjectFieldSpec {
+  const nestedFields = zodObjectToFieldSpecs(zobject, meta);
+
+  return {
+    name,
+    kind: "object",
+    required,
+    label: meta?.[name]?.label ?? humanizeKey(name),
+    description: meta?.[name]?.help ?? zobject.description ?? description,
+    defaultValue,
+    fields: nestedFields,
+  };
+}
+
+/** Build Array spec */
+function buildArraySpec(
+  name: string,
+  zarray: z.ZodArray<any>,
+  required: boolean,
+  description?: string,
+  defaultValue?: unknown,
+  meta?: FormMeta
+): ArrayFieldSpec {
+  // Extract array constraints
+  let minItems: number | undefined = (zarray as any).minLength;
+  let maxItems: number | undefined = (zarray as any).maxLength;
+
+  // Best-effort read of internals for min/max (some builds expose checks)
+  const checks: Array<any> = (zarray as any).def?.checks ?? [];
+  if (Array.isArray(checks) && checks.length) {
+    for (const c of checks) {
+      const inner = (c as any)._zod?.def;
+      // New v4 checks use { check: 'min_length'|'max_length'|'length_equals', ... }
+      if (inner?.check === "min_length") minItems = inner.minimum ?? minItems;
+      if (inner?.check === "max_length") maxItems = inner.maximum ?? maxItems;
+      if (inner?.check === "length_equals") {
+        minItems = inner.exact ?? minItems;
+        maxItems = inner.exact ?? maxItems;
+      }
+      // Legacy checks
+      if ((c as any).kind === "min") minItems = (c as any).value ?? minItems;
+      if ((c as any).kind === "max") maxItems = (c as any).value ?? maxItems;
+      if ((c as any).kind === "length") {
+        minItems = (c as any).value ?? minItems;
+        maxItems = (c as any).value ?? maxItems;
+      }
+    }
+  }
+
+  // Get the element type and convert to FieldSpec
+  const elementType = (zarray as any)._def?.element ?? (zarray as any).element;
+  const elementFieldSpec = zodTypeToFieldSpec(`element`, elementType, meta);
+
+  return {
+    name,
+    kind: "array",
+    required,
+    label: meta?.[name]?.label ?? humanizeKey(name),
+    description: meta?.[name]?.help ?? zarray.description ?? description,
+    defaultValue,
+    elementSpec: elementFieldSpec,
+    minItems,
+    maxItems,
+  };
+}
+
+/** Build Union spec */
+function buildUnionSpec(
+  name: string,
+  zunion: z.ZodUnion<any> | z.ZodDiscriminatedUnion<any, any>,
+  required: boolean,
+  description?: string,
+  defaultValue?: unknown,
+  meta?: FormMeta
+): UnionFieldSpec {
+  let options: FieldSpec[] = [];
+  let discriminatorKey: string | undefined;
+
+  if (zunion instanceof z.ZodDiscriminatedUnion) {
+    // Handle discriminated union
+    discriminatorKey = (zunion as any)._def?.discriminator;
+    const optionsMap =
+      (zunion as any)._def?.options ?? (zunion as any)._def?.optionsMap;
+
+    if (optionsMap instanceof Map) {
+      options = Array.from(optionsMap.values()).map(
+        (option: z.ZodTypeAny, index: number) =>
+          zodTypeToFieldSpec(`${name}_option_${index}`, option, meta)
+      );
+    } else if (Array.isArray(optionsMap)) {
+      options = optionsMap.map((option: z.ZodTypeAny, index: number) =>
+        zodTypeToFieldSpec(`${name}_option_${index}`, option, meta)
+      );
+    }
+  } else {
+    // Handle regular union
+    const unionOptions = (zunion as any)._def?.options ?? [];
+    options = unionOptions.map((option: z.ZodTypeAny, index: number) =>
+      zodTypeToFieldSpec(`${name}_option_${index}`, option, meta)
     );
-  if (t instanceof z.ZodUnion || t instanceof z.ZodDiscriminatedUnion)
-    throw new Error(
-      `Field "${name}": unions are not supported in simple forms.`
+  }
+
+  return {
+    name,
+    kind: "union",
+    required,
+    label: meta?.[name]?.label ?? humanizeKey(name),
+    description: meta?.[name]?.help ?? zunion.description ?? description,
+    defaultValue,
+    options,
+    discriminatorKey,
+  };
+}
+
+/** Convert a single Zod type to FieldSpec (helper for nested types) */
+function zodTypeToFieldSpec(
+  name: string,
+  zodType: z.ZodTypeAny,
+  meta: FormMeta = {}
+): FieldSpec {
+  const { type: base, optional, hasDefault, defaultValue } = unwrap(zodType);
+  const baseDescription: string | undefined = (base as any).description;
+  const required = !optional && !hasDefault;
+
+  // Check for unsupported types
+  assertSupported(name, base);
+
+  // STRING and string formats (Zod v4)
+  if (
+    base instanceof z.ZodString ||
+    ((z as any).ZodStringFormat &&
+      base instanceof (z as any).ZodStringFormat) ||
+    ((z as any).ZodEmail && base instanceof (z as any).ZodEmail) ||
+    ((z as any).ZodURL && base instanceof (z as any).ZodURL)
+  ) {
+    return buildStringSpec(
+      name,
+      base,
+      required,
+      baseDescription,
+      defaultValue,
+      meta
     );
-  if (t instanceof z.ZodObject)
-    throw new Error(
-      `Field "${name}": nested objects are not supported in simple forms.`
+  }
+
+  // NUMBER
+  if (base instanceof z.ZodNumber) {
+    return buildNumberSpec(
+      name,
+      base,
+      required,
+      baseDescription,
+      defaultValue,
+      meta
     );
+  }
+
+  // BOOLEAN
+  if (base instanceof z.ZodBoolean) {
+    return {
+      name,
+      kind: "boolean",
+      required,
+      label: meta?.[name]?.label ?? humanizeKey(name),
+      description: meta?.[name]?.help ?? base.description ?? baseDescription,
+      defaultValue,
+    };
+  }
+
+  // DATE
+  if (base instanceof z.ZodDate) {
+    return buildDateSpec(
+      name,
+      base,
+      required,
+      baseDescription,
+      defaultValue,
+      meta
+    );
+  }
+
+  // ENUM
+  if (base instanceof z.ZodEnum) {
+    const enumOptions = (base as any).options as
+      | (string | number)[]
+      | undefined;
+    const optionsArray: (string | number)[] = enumOptions ?? [];
+    return buildEnumSpec(
+      name,
+      optionsArray,
+      required,
+      base.description ?? baseDescription,
+      defaultValue,
+      meta
+    );
+  }
+
+  // LITERAL -> single-option enum
+  if (base instanceof z.ZodLiteral) {
+    const values = (base as any).def?.values ?? (base as any)._def?.values;
+    const lit = Array.isArray(values)
+      ? values[0]
+      : values?.values?.next?.().value ??
+        values?.[Symbol.iterator]?.().next?.().value;
+    return buildEnumSpec(
+      name,
+      [lit],
+      required,
+      base.description ?? baseDescription,
+      defaultValue ?? lit,
+      meta
+    );
+  }
+
+  // OBJECT
+  if (base instanceof z.ZodObject) {
+    return buildObjectSpec(
+      name,
+      base,
+      required,
+      baseDescription,
+      defaultValue,
+      meta
+    );
+  }
+
+  // ARRAY
+  if (base instanceof z.ZodArray) {
+    return buildArraySpec(
+      name,
+      base,
+      required,
+      baseDescription,
+      defaultValue,
+      meta
+    );
+  }
+
+  // UNION
+  if (base instanceof z.ZodUnion || base instanceof z.ZodDiscriminatedUnion) {
+    return buildUnionSpec(
+      name,
+      base,
+      required,
+      baseDescription,
+      defaultValue,
+      meta
+    );
+  }
+
+  // If we reached here, it's a type we don't handle
+  const tn =
+    (base as any)?.def?.typeName ?? base.constructor?.name ?? "Unknown";
+  throw new Error(`Field "${name}": unsupported Zod type "${tn}".`);
+}
+
+/** Guard against unsupported nested/complex types */
+function assertSupported(name: string, t: z.ZodTypeAny) {
+  // Allow: ZodObject, ZodArray, ZodUnion, ZodDiscriminatedUnion
+  // Disallow: ZodTuple, ZodRecord, ZodMap, ZodSet
   if (t instanceof z.ZodTuple)
-    throw new Error(
-      `Field "${name}": tuples are not supported in simple forms.`
-    );
+    throw new Error(`Field "${name}": tuples are not supported.`);
   if (t instanceof z.ZodRecord)
-    throw new Error(
-      `Field "${name}": records are not supported in simple forms.`
-    );
+    throw new Error(`Field "${name}": records are not supported.`);
   if (t instanceof z.ZodMap || t instanceof z.ZodSet)
-    throw new Error(
-      `Field "${name}": maps/sets are not supported in simple forms.`
-    );
+    throw new Error(`Field "${name}": maps/sets are not supported.`);
 }
 
 /**
@@ -329,126 +578,8 @@ export function zodObjectToFieldSpecs<T extends z.ZodRawShape>(
   const fields: FieldSpec[] = [];
 
   for (const [name, raw] of entries) {
-    const { type: base, optional, hasDefault, defaultValue } = unwrap(raw);
-
-    // Global description at field node level
-    const baseDescription: string | undefined = (base as any).description;
-
-    // enforce "simple" constraints
-    assertFlatSupported(name, base);
-
-    // STRING and string formats (Zod v4)
-    if (
-      base instanceof z.ZodString ||
-      ((z as any).ZodStringFormat &&
-        base instanceof (z as any).ZodStringFormat) ||
-      ((z as any).ZodEmail && base instanceof (z as any).ZodEmail) ||
-      ((z as any).ZodURL && base instanceof (z as any).ZodURL)
-    ) {
-      fields.push(
-        buildStringSpec(
-          name,
-          base,
-          /* required */ !optional && !hasDefault,
-          baseDescription,
-          defaultValue,
-          meta
-        )
-      );
-      continue;
-    }
-
-    // NUMBER
-    if (base instanceof z.ZodNumber) {
-      fields.push(
-        buildNumberSpec(
-          name,
-          base,
-          !optional && !hasDefault,
-          baseDescription,
-          defaultValue,
-          meta
-        )
-      );
-      continue;
-    }
-
-    // BOOLEAN
-    if (base instanceof z.ZodBoolean) {
-      const spec: BooleanFieldSpec = {
-        name,
-        kind: "boolean",
-        required: !optional && !hasDefault,
-        label: meta?.[name]?.label ?? humanizeKey(name),
-        description: meta?.[name]?.help ?? base.description ?? baseDescription,
-        defaultValue,
-      };
-      fields.push(spec);
-      continue;
-    }
-
-    // DATE
-    if (base instanceof z.ZodDate) {
-      fields.push(
-        buildDateSpec(
-          name,
-          base,
-          !optional && !hasDefault,
-          baseDescription,
-          defaultValue,
-          meta
-        )
-      );
-      continue;
-    }
-
-    // ENUM
-    if (base instanceof z.ZodEnum) {
-      // Zod's ZodEnum shape differs across versions; access options via any to avoid generic constraint issues
-      const enumOptions = (base as any).options as
-        | (string | number)[]
-        | undefined;
-      const optionsArray: (string | number)[] = enumOptions ?? [];
-      fields.push(
-        buildEnumSpec(
-          name,
-          optionsArray,
-          !optional && !hasDefault,
-          base.description ?? baseDescription,
-          defaultValue,
-          meta
-        )
-      );
-      continue;
-    }
-
-    // LITERAL -> single-option enum
-    if (base instanceof z.ZodLiteral) {
-      // v4 literal stores values in def.values (Set or Array)
-      const values = (base as any).def?.values ?? (base as any)._def?.values;
-      const lit = Array.isArray(values)
-        ? values[0]
-        : values?.values?.next?.().value ??
-          values?.[Symbol.iterator]?.().next?.().value;
-      fields.push(
-        buildEnumSpec(
-          name,
-          [lit],
-          !optional && !hasDefault,
-          base.description ?? baseDescription,
-          defaultValue ?? lit,
-          meta
-        )
-      );
-      continue;
-    }
-
-    // If we reached here, it's a type we don't handle in "simple" forms
-    const tn =
-      (base as any)?.def?.typeName ?? base.constructor?.name ?? "Unknown";
-    throw new Error(
-      `Field "${name}": unsupported Zod type "${tn}" in simple forms.`
-    );
+    const fieldSpec = zodTypeToFieldSpec(name, raw, meta);
+    fields.push(fieldSpec);
   }
 
   // sort by meta.order, preserve declaration order otherwise
