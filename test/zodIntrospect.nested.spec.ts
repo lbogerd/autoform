@@ -1,16 +1,16 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import * as z from "zod";
-import { zodObjectToFieldSpecs } from "../src/core/zodIntrospect";
 import type {
-  FormMeta,
-  FieldSpec,
-  ObjectFieldSpec,
   ArrayFieldSpec,
-  UnionFieldSpec,
-  StringFieldSpec,
-  NumberFieldSpec,
   BooleanFieldSpec,
+  FieldSpec,
+  FormMeta,
+  NumberFieldSpec,
+  ObjectFieldSpec,
+  StringFieldSpec,
+  UnionFieldSpec,
 } from "../src/core/types";
+import { zodObjectToFieldSpecs } from "../src/core/zodIntrospect";
 
 function byName<T extends FieldSpec>(fields: FieldSpec[], name: string) {
   const f = fields.find((x) => x.name === name);
@@ -27,10 +27,12 @@ describe("zodObjectToFieldSpecs (Nested Schemas)", () => {
           age: z.number(),
           active: z.boolean().default(true),
         }),
-        settings: z.object({
-          theme: z.enum(["light", "dark"]),
-          notifications: z.boolean(),
-        }).optional(),
+        settings: z
+          .object({
+            theme: z.enum(["light", "dark"]),
+            notifications: z.boolean(),
+          })
+          .optional(),
       });
 
       const fields = zodObjectToFieldSpecs(Schema);
@@ -106,9 +108,15 @@ describe("zodObjectToFieldSpecs (Nested Schemas)", () => {
       const address = byName<ObjectFieldSpec>(info.fields, "address");
 
       expect(address.fields).toHaveLength(3);
-      expect(byName<StringFieldSpec>(address.fields, "street").kind).toBe("string");
-      expect(byName<StringFieldSpec>(address.fields, "city").kind).toBe("string");
-      expect(byName<StringFieldSpec>(address.fields, "zipCode").kind).toBe("string");
+      expect(byName<StringFieldSpec>(address.fields, "street").kind).toBe(
+        "string"
+      );
+      expect(byName<StringFieldSpec>(address.fields, "city").kind).toBe(
+        "string"
+      );
+      expect(byName<StringFieldSpec>(address.fields, "zipCode").kind).toBe(
+        "string"
+      );
     });
   });
 
@@ -174,8 +182,12 @@ describe("zodObjectToFieldSpecs (Nested Schemas)", () => {
 
       const elementSpec = users.elementSpec as ObjectFieldSpec;
       expect(elementSpec.fields).toHaveLength(3);
-      expect(byName<NumberFieldSpec>(elementSpec.fields, "id").kind).toBe("number");
-      expect(byName<StringFieldSpec>(elementSpec.fields, "name").kind).toBe("string");
+      expect(byName<NumberFieldSpec>(elementSpec.fields, "id").kind).toBe(
+        "number"
+      );
+      expect(byName<StringFieldSpec>(elementSpec.fields, "name").kind).toBe(
+        "string"
+      );
       expect(byName(elementSpec.fields, "role").kind).toBe("enum");
     });
 
@@ -347,10 +359,12 @@ describe("zodObjectToFieldSpecs (Nested Schemas)", () => {
           z.object({
             name: z.string(),
             value: z.union([z.string(), z.number(), z.boolean()]),
-            metadata: z.object({
-              required: z.boolean(),
-              description: z.string().optional(),
-            }).optional(),
+            metadata: z
+              .object({
+                required: z.boolean(),
+                description: z.string().optional(),
+              })
+              .optional(),
           })
         ),
       });
@@ -379,9 +393,9 @@ describe("zodObjectToFieldSpecs (Nested Schemas)", () => {
             z.union([
               z.object({ type: z.literal("text"), content: z.string() }),
               z.object({ type: z.literal("number"), value: z.number() }),
-              z.object({ 
-                type: z.literal("list"), 
-                items: z.array(z.string()) 
+              z.object({
+                type: z.literal("list"),
+                items: z.array(z.string()),
               }),
             ])
           ),
@@ -423,13 +437,15 @@ describe("zodObjectToFieldSpecs (Nested Schemas)", () => {
               }),
             ])
           ),
-          preferences: z.union([
-            z.object({
-              theme: z.enum(["light", "dark"]),
-              notifications: z.boolean(),
-            }),
-            z.literal("default"),
-          ]).optional(),
+          preferences: z
+            .union([
+              z.object({
+                theme: z.enum(["light", "dark"]),
+                notifications: z.boolean(),
+              }),
+              z.literal("default"),
+            ])
+            .optional(),
         }),
       });
 
@@ -471,9 +487,15 @@ describe("zodObjectToFieldSpecs (Nested Schemas)", () => {
         cache: z.map(z.string(), z.number()),
       });
 
-      expect(() => zodObjectToFieldSpecs(WithTuple)).toThrow(/tuples are not supported/);
-      expect(() => zodObjectToFieldSpecs(WithRecord)).toThrow(/records are not supported/);
-      expect(() => zodObjectToFieldSpecs(WithMap)).toThrow(/maps\/sets are not supported/);
+      expect(() => zodObjectToFieldSpecs(WithTuple)).toThrow(
+        /tuples are not supported/
+      );
+      expect(() => zodObjectToFieldSpecs(WithRecord)).toThrow(
+        /records are not supported/
+      );
+      expect(() => zodObjectToFieldSpecs(WithMap)).toThrow(
+        /maps\/sets are not supported/
+      );
     });
 
     it("handles empty objects and arrays gracefully", () => {

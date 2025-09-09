@@ -1,15 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import * as z from "zod";
-import { zodObjectToFieldSpecs } from "../src/core/zodIntrospect";
 import type {
-  FormMeta,
-  FieldSpec,
-  StringFieldSpec,
-  NumberFieldSpec,
   BooleanFieldSpec,
-  EnumFieldSpec,
   DateFieldSpec,
+  EnumFieldSpec,
+  FieldSpec,
+  FormMeta,
+  NumberFieldSpec,
+  StringFieldSpec,
 } from "../src/core/types";
+import { zodObjectToFieldSpecs } from "../src/core/zodIntrospect";
 
 function byName<T extends FieldSpec>(fields: FieldSpec[], name: string) {
   const f = fields.find((x) => x.name === name);
@@ -124,8 +124,14 @@ describe("zodObjectToFieldSpecs (Zod v4)", () => {
     const WithRecord = z.object({ mapping: z.record(z.string(), z.string()) });
     const WithMap = z.object({ cache: z.map(z.string(), z.number()) });
 
-    expect(() => zodObjectToFieldSpecs(WithTuple)).toThrow(/tuples are not supported/);
-    expect(() => zodObjectToFieldSpecs(WithRecord)).toThrow(/records are not supported/);
-    expect(() => zodObjectToFieldSpecs(WithMap)).toThrow(/maps\/sets are not supported/);
+    expect(() => zodObjectToFieldSpecs(WithTuple)).toThrow(
+      /tuples are not supported/
+    );
+    expect(() => zodObjectToFieldSpecs(WithRecord)).toThrow(
+      /records are not supported/
+    );
+    expect(() => zodObjectToFieldSpecs(WithMap)).toThrow(
+      /maps\/sets are not supported/
+    );
   });
 });
