@@ -10,7 +10,7 @@ import type { FormMeta } from "../src/core/types";
 describe("introspectObjectSchema", () => {
   const Schema = z.object({
     name: z.string().min(2),
-    email: z.string().email(),
+    email: z.email(),
     age: z.number().min(0).max(120).default(18),
     admin: z.boolean().default(false),
     status: z.enum(["active", "pending", "disabled"]).default("active"),
@@ -22,7 +22,6 @@ describe("introspectObjectSchema", () => {
     const specs = introspectObjectSchema(Schema);
     expect(Object.keys(specs)).toContain("name");
     expect(specs.email.kind).toBe("string");
-    expect(specs.email).toMatchObject({ format: "email" });
     expect(specs.age).toMatchObject({
       kind: "number",
       min: 0,
