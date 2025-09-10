@@ -1,4 +1,3 @@
-// components/AutoForm.tsx
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as React from "react";
 import {
@@ -25,15 +24,8 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
 import type { FieldSpec, FormMeta } from "@/core/types";
-import { zodObjectToFieldSpecs } from "@/core/zodIntrospect";
-
-// ---------------------------------------------------------------------------
-// Utilities
-// ---------------------------------------------------------------------------
-
-function cn(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
+import { unwrap, zodObjectToFieldSpecs } from "@/core/zodIntrospect";
+import { cn } from "@/lib/utils";
 
 function fieldId(name: string) {
   return `field-${name}`;
@@ -43,14 +35,54 @@ function errorList(
   errors: FieldErrors
 ): Array<{ name: string; message: string }> {
   const out: Array<{ name: string; message: string }> = [];
-  for (const [name, err] of Object.entries(errors)) {
-    const msg =
-      (err as any)?.message ??
-      (typeof (err as any) === "object" && (err as any) !== null
-        ? (err as any).root?.message
-        : undefined);
-    if (msg) out.push({ name, message: String(msg) });
+
+  const visited = new WeakSet();
+
+  function isDomNode(x: any) {
+    if (!x || typeof x !== "object") return false;
+    // Skip if running in a DOM environment and node is a Node
+    try {
+      // eslint-disable-next-line no-undef
+      if (typeof Node !== "undefined" && x instanceof Node) return true;
+    } catch {
+      // ignore
+    }
+    // Basic guard: elements often have nodeType
+    if (typeof x.nodeType === "number") return true;
+    return false;
   }
+
+  function walk(prefix: string | undefined, node: any) {
+    if (!node) return;
+    if (visited.has(node)) return;
+    if (isDomNode(node)) return;
+    visited.add(node);
+
+    // If this node has a direct message, report it
+    if (typeof node.message === "string") {
+      out.push({ name: prefix ?? "", message: node.message });
+      return; // no need to traverse deeper for this node
+    }
+
+    // If it's an array-like error (from field array), iterate indices
+    if (Array.isArray(node)) {
+      node.forEach((child, idx) =>
+        walk(prefix ? `${prefix}.${idx}` : String(idx), child)
+      );
+      return;
+    }
+
+    // If it's a plain object, traverse its keys
+    if (typeof node === "object") {
+      for (const [k, v] of Object.entries(node)) {
+        if (k === "message") continue;
+        const name = prefix ? `${prefix}.${k}` : k;
+        walk(name, v as any);
+      }
+    }
+  }
+
+  walk(undefined, errors as any);
   return out;
 }
 
@@ -99,28 +131,23 @@ function buildDefaultValuesFromFields(fields: FieldSpec[]) {
   return acc;
 }
 
-// ---------------------------------------------------------------------------
-// Field renderers
-// ---------------------------------------------------------------------------
-
 type FieldPropsBase = {
   spec: FieldSpec;
   placeholder?: string;
   control: ReturnType<typeof useForm<any>>["control"];
   register: ReturnType<typeof useForm<any>>["register"];
   error?: string;
+  getError?: (path: string) => string | undefined;
+  wrapperClass?: string;
 };
 
-function StringField({ spec, placeholder, register, error }: FieldPropsBase) {
-  const common = register(spec.name, {
-    required: spec.required ? `${spec.label ?? spec.name} is required` : false,
-    minLength: (spec as any).minLength,
-    maxLength: (spec as any).maxLength,
-    pattern: (spec as any).pattern
-      ? { value: new RegExp((spec as any).pattern!), message: "Invalid format" }
-      : undefined,
-  });
-
+function StringField({
+  spec,
+  placeholder,
+  register,
+  error,
+  wrapperClass,
+}: FieldPropsBase) {
   const format = (spec as any).format as
     | "default"
     | "email"
@@ -128,6 +155,24 @@ function StringField({ spec, placeholder, register, error }: FieldPropsBase) {
     | "password"
     | "textarea"
     | undefined;
+
+  const common = register(spec.name, {
+    required: spec.required ? `${spec.name} is required` : false,
+    minLength: (spec as any).minLength,
+    maxLength: (spec as any).maxLength,
+    pattern: (spec as any).pattern
+      ? {
+          value: new RegExp((spec as any).pattern!),
+          message:
+            format === "email" ? "Invalid email format" : "Invalid format",
+        }
+      : format === "email"
+      ? {
+          value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+          message: "Invalid email format",
+        }
+      : undefined,
+  });
 
   const inputType =
     format === "email"
@@ -139,15 +184,17 @@ function StringField({ spec, placeholder, register, error }: FieldPropsBase) {
       : "text";
 
   return (
-    <div className="space-y-2">
-      <Label htmlFor={fieldId(spec.name)} className="flex items-center gap-1">
-        {spec.label ?? spec.name}
+    <div className={cn(wrapperClass ?? "", "space-y-2")}>
+      <div className="flex items-center gap-1">
+        <Label htmlFor={fieldId(spec.name)} className="flex items-center gap-1">
+          {spec.label ?? spec.name}
+        </Label>
         {spec.required && (
           <span aria-hidden className="text-destructive">
             *
           </span>
         )}
-      </Label>
+      </div>
       {format === "textarea" ? (
         <Textarea
           id={fieldId(spec.name)}
@@ -172,10 +219,16 @@ function StringField({ spec, placeholder, register, error }: FieldPropsBase) {
   );
 }
 
-function NumberField({ spec, placeholder, register, error }: FieldPropsBase) {
+function NumberField({
+  spec,
+  placeholder,
+  register,
+  error,
+  wrapperClass,
+}: FieldPropsBase) {
   const { min, max, step } = spec as any;
   const common = register(spec.name, {
-    required: spec.required ? `${spec.label ?? spec.name} is required` : false,
+    required: spec.required ? `${spec.name} is required` : false,
     valueAsNumber: true,
     min:
       typeof min === "number" ? { value: min, message: `≥ ${min}` } : undefined,
@@ -184,15 +237,17 @@ function NumberField({ spec, placeholder, register, error }: FieldPropsBase) {
   });
 
   return (
-    <div className="space-y-2">
-      <Label htmlFor={fieldId(spec.name)} className="flex items-center gap-1">
-        {spec.label ?? spec.name}
+    <div className={cn(wrapperClass ?? "", "space-y-2")}>
+      <div className="flex items-center gap-1">
+        <Label htmlFor={fieldId(spec.name)} className="flex items-center gap-1">
+          {spec.label ?? spec.name}
+        </Label>
         {spec.required && (
           <span aria-hidden className="text-destructive">
             *
           </span>
         )}
-      </Label>
+      </div>
       <Input
         id={fieldId(spec.name)}
         type="number"
@@ -217,6 +272,7 @@ function BooleanField({
   control,
   error,
   meta,
+  wrapperClass,
 }: FieldPropsBase & { meta?: FormMeta }) {
   const widget = meta?.[spec.name]?.widget;
   const useCheckbox = widget === "checkbox";
@@ -226,25 +282,25 @@ function BooleanField({
       name={spec.name}
       control={control}
       rules={{
-        required: spec.required
-          ? `${spec.label ?? spec.name} is required`
-          : false,
+        required: spec.required ? `${spec.name} is required` : false,
       }}
       render={({ field }) => (
-        <div className="space-y-2">
+        <div className={cn(wrapperClass ?? "", "space-y-2")}>
           <div className="flex items-center justify-between gap-3">
             <div className="flex flex-col">
-              <Label
-                htmlFor={fieldId(spec.name)}
-                className="flex items-center gap-1"
-              >
-                {spec.label ?? spec.name}
+              <div className="flex items-center gap-1">
+                <Label
+                  htmlFor={fieldId(spec.name)}
+                  className="flex items-center gap-1"
+                >
+                  {spec.label ?? spec.name}
+                </Label>
                 {spec.required && (
                   <span aria-hidden className="text-destructive">
                     *
                   </span>
                 )}
-              </Label>
+              </div>
               {spec.description && (
                 <p className="text-xs text-muted-foreground">
                   {spec.description}
@@ -281,6 +337,7 @@ function EnumField({
   placeholder,
   // @ts-ignore
   meta,
+  wrapperClass,
 }: FieldPropsBase & { meta?: FormMeta }) {
   const options = (spec as any).options ?? [];
   const widget = meta?.[spec.name]?.widget; // "select" | "radio" preferred
@@ -292,20 +349,20 @@ function EnumField({
         name={spec.name}
         control={control}
         rules={{
-          required: spec.required
-            ? `${spec.label ?? spec.name} is required`
-            : false,
+          required: spec.required ? `${spec.name} is required` : false,
         }}
         render={({ field }) => (
-          <div className="space-y-2">
-            <Label className="flex items-center gap-1">
-              {spec.label ?? spec.name}
+          <div className={cn(wrapperClass ?? "", "space-y-2")}>
+            <div className="flex items-center gap-1">
+              <Label className="flex items-center gap-1">
+                {spec.label ?? spec.name}
+              </Label>
               {spec.required && (
                 <span aria-hidden className="text-destructive">
                   *
                 </span>
               )}
-            </Label>
+            </div>
             <RadioGroup
               value={String(field.value ?? "")}
               onValueChange={(val) => {
@@ -347,23 +404,23 @@ function EnumField({
       name={spec.name}
       control={control}
       rules={{
-        required: spec.required
-          ? `${spec.label ?? spec.name} is required`
-          : false,
+        required: spec.required ? `${spec.name} is required` : false,
       }}
       render={({ field }) => (
-        <div className="space-y-2">
-          <Label
-            htmlFor={fieldId(spec.name)}
-            className="flex items-center gap-1"
-          >
-            {spec.label ?? spec.name}
+        <div className={cn(wrapperClass ?? "", "space-y-2")}>
+          <div className="flex items-center gap-1">
+            <Label
+              htmlFor={fieldId(spec.name)}
+              className="flex items-center gap-1"
+            >
+              {spec.label ?? spec.name}
+            </Label>
             {spec.required && (
               <span aria-hidden className="text-destructive">
                 *
               </span>
             )}
-          </Label>
+          </div>
           <Select
             value={field.value !== undefined ? String(field.value) : ""}
             onValueChange={(val) => {
@@ -392,7 +449,7 @@ function EnumField({
   );
 }
 
-function DateField({ spec, control, error }: FieldPropsBase) {
+function DateField({ spec, control, error, wrapperClass }: FieldPropsBase) {
   // Native <input type="date"> with controller to keep Date in form state
   const { min, max } = spec as any;
 
@@ -401,24 +458,17 @@ function DateField({ spec, control, error }: FieldPropsBase) {
       name={spec.name}
       control={control}
       rules={{
-        required: spec.required
-          ? `${spec.label ?? spec.name} is required`
-          : false,
+        required: spec.required ? `${spec.name} is required` : false,
       }}
       render={({ field }) => {
         const inputVal = dateToInputValue(field.value as any);
         return (
-          <div className="space-y-2">
+          <div className={cn(wrapperClass ?? "", "space-y-2")}>
             <Label
               htmlFor={fieldId(spec.name)}
               className="flex items-center gap-1"
             >
               {spec.label ?? spec.name}
-              {spec.required && (
-                <span aria-hidden className="text-destructive">
-                  *
-                </span>
-              )}
             </Label>
             <Input
               id={fieldId(spec.name)}
@@ -447,15 +497,19 @@ function ObjectField({
   control,
   error,
   meta,
+  register,
+  getError,
 }: FieldPropsBase & { meta?: FormMeta }) {
   const objectSpec = spec as any; // ObjectFieldSpec
 
   return (
     <div className="space-y-4">
-      <Label className="text-base font-medium">
-        {spec.label ?? spec.name}
-        {spec.required && <span className="text-red-500 ml-1">*</span>}
-      </Label>
+      <div className="flex items-center gap-1">
+        <Label className="text-base font-medium">
+          {spec.label ?? spec.name}
+          {spec.required && <span className="text-red-500 ml-1">*</span>}
+        </Label>
+      </div>
       {spec.description && (
         <p className="text-xs text-muted-foreground">{spec.description}</p>
       )}
@@ -466,9 +520,11 @@ function ObjectField({
             {renderFieldInternal(
               field,
               control,
-              () => ({}),
+              // use the register passed into this component via props
+              register,
               meta,
-              `${spec.name}.${field.name}`
+              `${spec.name}.${field.name}`,
+              getError ? getError(`${spec.name}.${field.name}`) : undefined
             )}
           </div>
         ))}
@@ -484,6 +540,8 @@ function ArrayField({
   control,
   error,
   meta,
+  register,
+  getError,
 }: FieldPropsBase & { meta?: FormMeta }) {
   const arraySpec = spec as any; // ArrayFieldSpec
   const { fields, append, remove } = useFieldArray({
@@ -494,15 +552,50 @@ function ArrayField({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Label className="text-base font-medium">
-          {spec.label ?? spec.name}
-          {spec.required && <span className="text-red-500 ml-1">*</span>}
-        </Label>
+        <div className="flex items-center gap-1">
+          <Label className="text-base font-medium">
+            {spec.label ?? spec.name}
+            {spec.required && <span className="text-red-500 ml-1">*</span>}
+          </Label>
+        </div>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          onClick={() => append({})}
+          onClick={() => {
+            // Append a reasonable empty value depending on element type
+            const elem = arraySpec.elementSpec as any;
+            if (elem.kind === "object") {
+              // build empty object matching nested fields
+              const emptyObj: Record<string, any> = {};
+              if (elem.fields && Array.isArray(elem.fields)) {
+                for (const f of elem.fields) {
+                  if (typeof f.defaultValue !== "undefined") {
+                    emptyObj[f.name] = f.defaultValue;
+                  } else if (f.kind === "object") {
+                    emptyObj[f.name] = {};
+                  } else if (f.kind === "array") {
+                    emptyObj[f.name] = [];
+                  } else if (f.kind === "number") {
+                    emptyObj[f.name] = 0;
+                  } else if (f.kind === "boolean") {
+                    emptyObj[f.name] = false;
+                  } else {
+                    emptyObj[f.name] = "";
+                  }
+                }
+              }
+              append(emptyObj);
+            } else if (elem.kind === "array") {
+              append([]);
+            } else if (elem.kind === "number") {
+              append(0);
+            } else if (elem.kind === "boolean") {
+              append(false);
+            } else {
+              append("");
+            }
+          }}
         >
           Add Item
         </Button>
@@ -516,7 +609,7 @@ function ArrayField({
         {fields.map((field, index) => (
           <div key={field.id} className="border rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium">Item {index + 1}</span>
+              <span className="text-sm font-medium">{`Item ${index + 1}`}</span>
               <Button
                 type="button"
                 variant="ghost"
@@ -529,9 +622,10 @@ function ArrayField({
             {renderFieldInternal(
               arraySpec.elementSpec,
               control,
-              () => ({}),
+              register,
               meta,
-              `${spec.name}.${index}`
+              `${spec.name}.${index}`,
+              getError ? getError(`${spec.name}.${index}`) : undefined
             )}
           </div>
         ))}
@@ -547,9 +641,10 @@ function UnionField({
   control,
   error,
   meta,
+  register,
 }: FieldPropsBase & { meta?: FormMeta }) {
   const unionSpec = spec as any; // UnionFieldSpec
-  const [selectedOption, setSelectedOption] = React.useState<number>(0);
+  const [selectedOption, setSelectedOption] = React.useState<number>(-1);
 
   return (
     <div className="space-y-4">
@@ -564,10 +659,10 @@ function UnionField({
 
       <div className="space-y-3">
         <Select
-          value={selectedOption.toString()}
+          value={selectedOption >= 0 ? selectedOption.toString() : ""}
           onValueChange={(value) => setSelectedOption(parseInt(value, 10))}
         >
-          <SelectTrigger>
+          <SelectTrigger id={fieldId(spec.name)}>
             <SelectValue placeholder="Select type..." />
           </SelectTrigger>
           <SelectContent>
@@ -579,12 +674,12 @@ function UnionField({
           </SelectContent>
         </Select>
 
-        {unionSpec.options?.[selectedOption] && (
+        {selectedOption >= 0 && unionSpec.options?.[selectedOption] && (
           <div className="border rounded-lg p-4">
             {renderFieldInternal(
               unionSpec.options[selectedOption],
               control,
-              () => ({}),
+              register,
               meta,
               spec.name
             )}
@@ -604,16 +699,23 @@ function renderFieldInternal(
   register: any,
   meta?: FormMeta,
   nameOverride?: string,
-  error?: string
+  error?: string,
+  getError?: (path: string) => string | undefined
 ): React.ReactNode {
   const fieldName = nameOverride ?? spec.name;
   const fieldError = error; // You might need to handle nested errors differently
 
+  // Use a shallow copy of the spec but with the overridden name so nested
+  // renderers use the correct field ids and registration names.
+  const specWithName = { ...spec, name: fieldName } as FieldSpec;
+
   const commonProps = {
-    spec: { ...spec, name: fieldName },
+    spec: specWithName,
     control,
     register,
     error: fieldError,
+    getError,
+    wrapperClass: undefined,
   };
 
   switch (spec.kind) {
@@ -681,9 +783,43 @@ export function AutoForm<TSchema extends z.ZodObject<any>>({
     ...(defaultValues as any),
   };
 
+  // Create enhanced schema that enforces required string minimums
+  const enhancedSchema = React.useMemo(() => {
+    const shape = schema.shape;
+    const enhancedShape: Record<string, z.ZodTypeAny> = {};
+
+    for (const [key, value] of Object.entries(shape)) {
+      const fieldSpec = fields.find((f) => f.name === key);
+      if (fieldSpec?.kind === "string" && fieldSpec.required) {
+        // For required string fields, ensure they have minimum length validation
+        const { type: unwrappedType } = unwrap(value as z.ZodTypeAny);
+        if (unwrappedType instanceof z.ZodString) {
+          const hasMinConstraint = (unwrappedType as any)._def?.checks?.some(
+            (check: any) =>
+              check.kind === "min" || check._zod?.def?.check === "min_length"
+          );
+          if (!hasMinConstraint) {
+            enhancedShape[key] = (value as z.ZodString).min(
+              1,
+              `${key} is required`
+            );
+          } else {
+            enhancedShape[key] = value as z.ZodTypeAny;
+          }
+        } else {
+          enhancedShape[key] = value as z.ZodTypeAny;
+        }
+      } else {
+        enhancedShape[key] = value as z.ZodTypeAny;
+      }
+    }
+
+    return z.object(enhancedShape) as TSchema;
+  }, [schema, fields]);
+
   const form = useForm<z.infer<TSchema>>({
     // @ts-expect-error TODO complains about generic types, fix later
-    resolver: zodResolver(schema),
+    resolver: zodResolver(enhancedSchema),
     defaultValues: mergedDefaults as any,
     mode: "onBlur",
   });
@@ -695,8 +831,30 @@ export function AutoForm<TSchema extends z.ZodObject<any>>({
     formState: { errors, isSubmitting, isSubmitSuccessful },
   } = form;
 
+  // Reset form when defaultValues prop changes
+  React.useEffect(() => {
+    // use form.reset to apply new defaults
+    try {
+      form.reset(mergedDefaults as any);
+    } catch {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(mergedDefaults)]);
+
   function renderField(spec: FieldSpec) {
-    const err = errors[spec.name]?.message as string | undefined;
+    // Resolve nested error by path (supports dot notation for nested/array fields)
+    function getErrorByPath(path: string): string | undefined {
+      const parts = path.split(".");
+      let cur: any = errors as any;
+      for (const p of parts) {
+        if (!cur) return undefined;
+        cur = cur[p];
+      }
+      return cur?.message as string | undefined;
+    }
+
+    const err = getErrorByPath(spec.name) as string | undefined;
     const placeholder = meta?.[spec.name]?.placeholder;
     const width = meta?.[spec.name]?.width ?? "full";
 
@@ -718,6 +876,8 @@ export function AutoForm<TSchema extends z.ZodObject<any>>({
             register={register}
             control={control}
             error={err}
+            getError={(p: string) => getErrorByPath(p)}
+            wrapperClass={wrapperClass}
           />
         )}
         {spec.kind === "number" && (
@@ -727,6 +887,8 @@ export function AutoForm<TSchema extends z.ZodObject<any>>({
             register={register}
             control={control}
             error={err}
+            getError={(p: string) => getErrorByPath(p)}
+            wrapperClass={wrapperClass}
           />
         )}
         {spec.kind === "boolean" && (
@@ -735,7 +897,9 @@ export function AutoForm<TSchema extends z.ZodObject<any>>({
             register={register}
             control={control}
             error={err}
+            getError={(p: string) => getErrorByPath(p)}
             meta={meta}
+            wrapperClass={wrapperClass}
           />
         )}
         {spec.kind === "enum" && (
@@ -744,8 +908,10 @@ export function AutoForm<TSchema extends z.ZodObject<any>>({
             register={register}
             control={control}
             error={err}
+            getError={(p: string) => getErrorByPath(p)}
             placeholder={placeholder}
             meta={meta}
+            wrapperClass={wrapperClass}
           />
         )}
         {spec.kind === "date" && (
@@ -754,6 +920,8 @@ export function AutoForm<TSchema extends z.ZodObject<any>>({
             register={register}
             control={control}
             error={err}
+            getError={(p: string) => getErrorByPath(p)}
+            wrapperClass={wrapperClass}
           />
         )}
         {spec.kind === "object" && (
@@ -762,7 +930,9 @@ export function AutoForm<TSchema extends z.ZodObject<any>>({
             register={register}
             control={control}
             error={err}
+            getError={(p: string) => getErrorByPath(p)}
             meta={meta}
+            wrapperClass={wrapperClass}
           />
         )}
         {spec.kind === "array" && (
@@ -771,7 +941,9 @@ export function AutoForm<TSchema extends z.ZodObject<any>>({
             register={register}
             control={control}
             error={err}
+            getError={(p: string) => getErrorByPath(p)}
             meta={meta}
+            wrapperClass={wrapperClass}
           />
         )}
         {spec.kind === "union" && (
@@ -780,7 +952,9 @@ export function AutoForm<TSchema extends z.ZodObject<any>>({
             register={register}
             control={control}
             error={err}
+            getError={(p: string) => getErrorByPath(p)}
             meta={meta}
+            wrapperClass={wrapperClass}
           />
         )}
       </div>

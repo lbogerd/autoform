@@ -16,17 +16,7 @@ import type {
   UnionFieldSpec,
 } from "./types";
 
-/** Humanize a key like "firstName" -> "First name" */
-function humanizeKey(key: string): string {
-  return key
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/^./, (c) => c.toUpperCase());
-}
-
-type UnwrapResult = {
+export type UnwrapResult = {
   type: z.ZodTypeAny;
   optional: boolean;
   nullable: boolean;
@@ -35,7 +25,7 @@ type UnwrapResult = {
 };
 
 /** Peel wrappers: optional/nullable/default/pipe/catch/readonly */
-function unwrap(schema: z.ZodTypeAny): UnwrapResult {
+export function unwrap(schema: z.ZodTypeAny): UnwrapResult {
   let s: z.ZodTypeAny = schema;
   let optional = false;
   let nullable = false;
@@ -173,7 +163,7 @@ function buildStringSpec(
     name,
     kind: "string",
     required,
-    label: meta?.[name]?.label ?? humanizeKey(name),
+    label: meta?.[name]?.label ?? name,
     description:
       meta?.[name]?.help ?? (zodString as any).description ?? description,
     defaultValue,
@@ -214,7 +204,7 @@ function buildNumberSpec(
     name,
     kind: "number",
     required,
-    label: meta?.[name]?.label ?? humanizeKey(name),
+    label: meta?.[name]?.label ?? name,
     description: meta?.[name]?.help ?? znum.description ?? description,
     defaultValue,
     min,
@@ -250,7 +240,7 @@ function buildDateSpec(
     name,
     kind: "date",
     required,
-    label: meta?.[name]?.label ?? humanizeKey(name),
+    label: meta?.[name]?.label ?? name,
     description: meta?.[name]?.help ?? zdate.description ?? description,
     defaultValue,
     min,
@@ -279,7 +269,7 @@ function buildEnumSpec(
     name,
     kind: "enum",
     required,
-    label: meta?.[name]?.label ?? humanizeKey(name),
+    label: meta?.[name]?.label ?? name,
     description: meta?.[name]?.help ?? description,
     defaultValue,
     options: opt,
@@ -301,7 +291,7 @@ function buildObjectSpec(
     name,
     kind: "object",
     required,
-    label: meta?.[name]?.label ?? humanizeKey(name),
+    label: meta?.[name]?.label ?? name,
     description: meta?.[name]?.help ?? zobject.description ?? description,
     defaultValue,
     fields: nestedFields,
@@ -351,7 +341,7 @@ function buildArraySpec(
     name,
     kind: "array",
     required,
-    label: meta?.[name]?.label ?? humanizeKey(name),
+    label: meta?.[name]?.label ?? name,
     description: meta?.[name]?.help ?? zarray.description ?? description,
     defaultValue,
     elementSpec: elementFieldSpec,
@@ -400,7 +390,7 @@ function buildUnionSpec(
     name,
     kind: "union",
     required,
-    label: meta?.[name]?.label ?? humanizeKey(name),
+    label: meta?.[name]?.label ?? name,
     description: meta?.[name]?.help ?? zunion.description ?? description,
     defaultValue,
     options,
@@ -457,7 +447,7 @@ function zodTypeToFieldSpec(
       name,
       kind: "boolean",
       required,
-      label: meta?.[name]?.label ?? humanizeKey(name),
+      label: meta?.[name]?.label ?? name,
       description: meta?.[name]?.help ?? base.description ?? baseDescription,
       defaultValue,
     };
