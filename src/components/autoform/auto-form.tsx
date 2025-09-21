@@ -1,55 +1,30 @@
 import { AutoField } from "./auto-field";
 import type { JsonSchema } from "./types";
 
-export const resolveRef = (
-  ref: string,
-  schema: JsonSchema,
-  visited: Record<string, JsonSchema>
-): JsonSchema | null => {
-  if (visited[ref]) return visited[ref];
+export const replaceRefs = (schema: JsonSchema): JsonSchema => {
+  // find all properties that are $ref and replace them with the actual definition from $defs
+  const defs = schema.$defs || {};
+  const resolvedProperties: Record<string, any> = {};
 
-  const parts = ref.split("/");
-  let current: any = schema;
+  for (const [key, value] of Object.entries(schema.properties)) {
+    if (typeof value === "object" && "$ref" in value) {
+      const ref = (value as { $ref: string }).$ref;
+      const refKey = ref.replace("#/$defs/", "");
 
-  for (const part of parts) {
-    if (!current) return null;
-    current = current[part];
+      if (refKey in defs) {
+        resolvedProperties[key] = defs[refKey];
+      } else {
+        resolvedProperties[key] = value; // keep as is
+      }
+    } else {
+      resolvedProperties[key] = value;
+    }
   }
 
-  return (current as JsonSchema) || null;
-};
-
-export const replaceRefs = (schema: JsonSchema): JsonSchema => {
-  const visited: Record<string, JsonSchema> = Object.create(null);
-  const replaceRef = (ref: string): JsonSchema | null => {
-    const resolved = resolveRef(ref, schema, visited);
-    if (resolved) {
-      visited[ref] = resolved;
-    }
-    return resolved;
+  return {
+    ...schema,
+    properties: resolvedProperties,
   };
-
-  const recurse = (obj: any): any => {
-    if (Array.isArray(obj)) {
-      return obj.map(recurse);
-    }
-    if (obj && typeof obj === "object") {
-      if (obj.$ref && typeof obj.$ref === "string") {
-        const resolved = replaceRef(obj.$ref);
-        if (resolved) {
-          return recurse(resolved);
-        }
-      }
-      const newObj: any = {};
-      for (const key in obj) {
-        newObj[key] = recurse(obj[key]);
-      }
-      return newObj;
-    }
-    return obj;
-  };
-
-  return recurse(schema);
 };
 
 export const AutoForm = ({ schema }: { schema: JsonSchema }) => {
