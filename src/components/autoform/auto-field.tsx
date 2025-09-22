@@ -3,12 +3,17 @@ import { Input } from "../ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "../ui/select";
 import type { JsonProperty, StringProperty } from "./types";
+import type { _JSONSchema } from "node_modules/zod/v4/core/json-schema.d.cts";
 
 export const AutoField = ({
   jsonProperty,
 }: {
-  jsonProperty: JsonProperty;
+  jsonProperty: JsonProperty | _JSONSchema;
 }): ReactNode => {
+  if (typeof jsonProperty !== "object" || jsonProperty === null) {
+    return <span>Invalid property schema: {JSON.stringify(jsonProperty)}</span>;
+  }
+
   if ("anyOf" in jsonProperty && jsonProperty.anyOf) {
     // for simplicity, just take the first anyOf option
     // TODO: make this handle multiple options by generating tabs
@@ -29,8 +34,8 @@ export const AutoField = ({
       <Select>
         <SelectTrigger>Select value...</SelectTrigger>
         <SelectContent>
-          {jsonProperty.enum.map((option: string | number) => (
-            <SelectItem key={option} value={String(option)}>
+          {jsonProperty.enum.map((option) => (
+            <SelectItem key={String(option)} value={String(option)}>
               {option}
             </SelectItem>
           ))}
@@ -42,7 +47,21 @@ export const AutoField = ({
   switch (type) {
     case "array":
       // TODO: make it a single field for now, add support for multiple items later
-      return <AutoField jsonProperty={jsonProperty.items} />;
+      // jsonSchema items can be: true | _JSONSchema | _JSONSchema[]
+      const items = (jsonProperty as any).items;
+      if (!items) {
+        return <></>;
+      }
+      // Tuple-style items (array) - pick the first item for now
+      if (Array.isArray(items)) {
+        return <AutoField jsonProperty={items[0] as JsonProperty} />;
+      }
+      // items === true means any type allowed; render a generic input
+      if (items === true) {
+        return <Input type="text" />;
+      }
+      // single schema
+      return <AutoField jsonProperty={items as JsonProperty} />;
 
     case "object":
       // If explicit properties exist, render them

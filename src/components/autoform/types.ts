@@ -1,3 +1,5 @@
+import type { _JSONSchema } from "node_modules/zod/v4/core/json-schema.d.cts";
+
 // Shared base for all property variants
 export type BaseProperty = {
   description?: string;
@@ -49,12 +51,12 @@ export type TypeProperty =
 export type JsonProperty = { anyOf?: TypeProperty[] } | TypeProperty;
 
 export type JsonSchema = {
-  $schema: string;
+  $schema?: string;
   title?: string;
   description?: string;
-  examples: Record<string, unknown>[];
-  type: string;
-  properties: Record<string, JsonProperty>;
+  examples?: unknown[];
+  type?: string;
+  properties?: Record<string, _JSONSchema>;
   required?: string[];
-  $defs?: Record<string, JsonProperty>;
+  $defs?: Record<string, _JSONSchema>;
 };

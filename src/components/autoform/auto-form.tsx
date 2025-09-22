@@ -6,7 +6,7 @@ export const replaceRefs = (schema: JsonSchema): JsonSchema => {
   const defs = schema.$defs || {};
   const resolvedProperties: Record<string, any> = {};
 
-  for (const [key, value] of Object.entries(schema.properties)) {
+  for (const [key, value] of Object.entries(schema.properties || {})) {
     if (typeof value === "object" && "$ref" in value) {
       const ref = (value as { $ref: string }).$ref;
       const refKey = ref.replace("#/$defs/", "");
@@ -33,7 +33,7 @@ export const AutoForm = ({ schema }: { schema: JsonSchema }) => {
   return (
     <form action="">
       <ul className="space-y-4">
-        {Object.entries(resolvedSchema.properties).map(([key, value]) => (
+        {Object.entries(resolvedSchema.properties || {}).map(([key, value]) => (
           <li key={key}>
             <h2>{key}</h2>
             <AutoField jsonProperty={value} />
