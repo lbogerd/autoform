@@ -1,150 +1,89 @@
-# AutoForm (Zod-only)
+# AutoForm (JSON Schema prototype)
 
-Generate fully-featured forms from a **flat** `z.object({ ... })` Zod schema.
-Built with **React**, **react-hook-form** (RHF) + `zodResolver`, and **shadcn/ui**.
+AutoForm is an experiment that renders a very small set of UI controls directly from a JSON Schema document. The current focus is
+feeding it with the output of [`z.toJSONSchema`](https://zod.dev/?id=json-schema) from **Zod v4**, so we can preview large schemas
+(such as the "kitchen sink" test schema) without hand-coding every field.
 
 ---
 
 ## Overview
 
-* **What it does:** turns a *simple* Zod object schema into a typed `FieldSpec[]`, then renders a complete form (labels, placeholders, validation, errors, defaults).
-* **Scope (for now):** flat forms only — no unions, arrays, or nested objects to keep it simple.
-* **Why:** this library will be used in a Storybook-like project to auto-generate forms for component previews.
+- **Input:** a JSON Schema object. Internally the component resolves `$ref` values defined in `$defs` so that reused fields become
+directly renderable (`replaceRefs` in [`auto-form.tsx`](src/components/autoform/auto-form.tsx)).
+- **Renderer:** [`AutoField`](src/components/autoform/auto-field.tsx) picks a basic control for each property based on its `type`,
+`format`, and helpers like `enum`, `anyOf`, and `additionalProperties`.
+- **Status:** intentionally lightweight – there is no React Hook Form integration yet, and validation/submission wiring is out of
+scope for this prototype.
 
 ---
 
-## What we have so far
+## What currently renders
 
-* **Zod-only introspection** (`core/zodIntrospect.ts`)
+The renderer covers the pieces of JSON Schema that fall out of the Zod v4 conversion:
 
-  * Unwraps `.optional()`, `.nullable()`, `.default()`, `ZodEffects`.
-  * Extracts constraints:
-    * `string` → `min/max/regex`, heuristics for `email/url/password/textarea`.
-    * `number` → `min/max/multipleOf → step`.
-    * `boolean` → switch/checkbox ready.
-    * `enum` & `nativeEnum` → options (with numeric enum reverse-map handling).
-    * `date` → `min/max`.
-  * Reads `z.describe()` for descriptions; **`meta`** overrides everything.
+- Strings map to text inputs and honour formats: `email`, `uri`, `date-time` (`<DatePicker /> + time input`), `date`, and `time`.
+- Numbers and integers share a numeric input.
+- Booleans render as checkboxes.
+- Enumerations become a Radix `Select` listing the available options.
+- Arrays display the schema for the first item (tuples pick the first entry, homogeneous arrays reuse the item schema).
+- Objects with explicit `properties` render nested lists; record-like objects that use `additionalProperties` show a key/value row
+and respect any `propertyNames.pattern` constraint for the key field.
+- `anyOf` chooses the first option for now (future work could surface all variants).
+- The literal `null` type renders as a static "null" placeholder.
 
-* **Renderer** (`components/AutoForm.tsx`)
-  * RHF + `@hookform/resolvers/zod` for validation.
-  * shadcn/ui inputs (Input, Textarea, Switch, Select, RadioGroup).
-  * Inline field errors **and** optional top error summary.
-  * Defaults from schema `.default()` are respected; can be merged with `defaultValues`.
-  * Simple responsive layout (`width: 'full' | 'half'`).
-
-* **Metadata** (`core/types.ts`)
-  * `FormMeta` for label, placeholder, help, order, width, widget, options (enum labels).
+The [`test/kitchen-sink-schema.ts`](test/kitchen-sink-schema.ts) fixture exercises most of these cases and provides the example
+schema used by the local demo page.
 
 ---
 
-## Quick start
+## Usage
 
-```bash
-# peer deps (adjust to your setup)
-pnpm i zod react-hook-form @hookform/resolvers
-# warning: shadcn/ui should already be set up in your project (for now)
-```
+### 1. Produce JSON Schema (Zod v4 example)
 
-```tsx
-import * as z from "zod";
-import { AutoForm } from "@/components/AutoForm";
-import type { FormMeta } from "@/core/types";
+```ts
+import { z } from "zod";
 
-const UserSchema = z.object({
-  firstName: z.string().min(2).describe("Your given name"),
+const User = z.object({
+  name: z.string().min(1),
   email: z.email(),
-  age: z.number().min(13).default(18),
-  newsletter: z.boolean().default(true),
-  role: z.enum(["admin", "editor", "viewer"]).default("viewer"),
-  birthday: z.date().optional(),
+  website: z.string().url().optional(),
+  tags: z.array(z.string()).min(1),
+  role: z.enum(["admin", "editor", "viewer"]),
 });
 
-const meta: FormMeta = {
-  firstName: { order: 1, placeholder: "Ada", width: "half" },
-  email: { order: 2, placeholder: "ada@example.com" },
-  age: { order: 3, width: "half" },
-  newsletter: { order: 4, help: "Occasional product emails", width: "half" },
-  role: { order: 5, widget: "select" },
-  birthday: { order: 6, widget: "date" },
-};
+const userJsonSchema = z.toJSONSchema(User, { reused: "ref" });
+```
 
-export default function Page() {
+`z.toJSONSchema` is optional; any JSON Schema object with the shapes listed above will work.
+
+### 2. Render the form
+
+```tsx
+import { AutoForm } from "@/components/autoform/auto-form";
+
+export function UserPreview() {
   return (
-    <AutoForm
-      schema={UserSchema}
-      meta={meta}
-      submitLabel="Create user"
-      onSubmit={(values) => console.log(values)}
-    />
+    <div className="max-w-xl space-y-4">
+      <AutoForm schema={userJsonSchema} />
+    </div>
   );
 }
 ```
 
----
-
-## API
-
-### `<AutoForm />` props
-
-| prop                 | type                                | required | notes                                                   |
-| -------------------- | ----------------------------------- | -------- | ------------------------------------------------------- |
-| `schema`             | `z.ZodObject<any>`                  | ✅        | Flat object only                                        |
-| `meta`               | `FormMeta`                          |          | Labels, placeholders, order, width, widget, enum labels |
-| `onSubmit`           | `(values) => void \| Promise<void>` | ✅        | RHF `handleSubmit` wrapper                              |
-| `submitLabel`        | `string`                            |          | Button text (default: `"Save"`)                         |
-| `defaultValues`      | `Partial<Infer<schema>>`            |          | Merged over schema `.default()`s                        |
-| `showErrorSummary`   | `boolean`                           |          | Top summary (default: `true`)                           |
-| `renderFooterExtras` | `React.ReactNode`                   |          | Extra actions near the submit button                    |
-
-### `FormMeta` (snippet)
-
-```ts
-type FormMeta = {
-  [field: string]: {
-    label?: string;
-    placeholder?: string;
-    help?: string;
-    order?: number;
-    width?: "full" | "half" | "auto";
-    widget?: "select" | "radio" | "checkbox" | "switch" | "number" | "date";
-    options?: { label: string; value: string | number }[];
-  };
-};
-```
+The component automatically resolves `$ref` definitions before rendering, so schemas that reuse components (e.g. addresses) will
+show fully inlined fields.
 
 ---
 
-## Supported Zod types (flat)
+## Limitations & next steps
 
-* `z.string()` (+ `.min/.max/.regex`) and Zod v4 string formats: `z.email()`, `z.url()`
-* `z.number()` (+ `.min/.max/.multipleOf`, `int` respected via constraints)
-* `z.boolean()`
-* `z.enum([...])`, `z.nativeEnum(Enum)`
-* `z.date()` (+ `.min/.max`)
-* `z.literal()` → treated as single-option enum
-* Wrappers: `.optional()`, `.nullable()`, `.default()`, `ZodEffects` (unwrapped for UI)
+This is a prototype; important gaps remain:
 
-**Not supported (by design for this version):** arrays, unions, nested objects, records, tuples, maps/sets.
+- Only the first branch of an `anyOf` is displayed.
+- Arrays are rendered as a single set of controls (no add/remove UI yet).
+- There is no form state library wiring, validation messages, labels, or submission handling.
+- Formats beyond the ones listed above fall back to plain inputs.
+- Complex widgets (files, discriminated unions, recursive data) need dedicated UX.
 
----
-
-## Roadmap / What’s next
-
-* **Support for more Zod types**: add support for arrays, unions, nested objects, records, tuples, maps/sets.
-* **TypeScript support**: improve type inference and error messages.
-* **JSON Schema input**: optional path to support non-Zod vendors (Valibot, Effect, ArkType) via a single mapping layer.
-* **Custom primitives**: pluggable widget registry (e.g. phone, currency, slider, code editor) + per-field formatter/parser.
-* **TanStack Form**: alternate renderer layer with the same `FieldSpec[]` core.
-* Extras we _might_ add:
-  * i18n for labels/help (e.g. `labelKey` in `meta`).
-  * Field-level `readOnly/disabled/hidden` in `meta`.
-  * Error message customization per field.
-
----
-
-## Limitations & notes
-
-* Uses some **Zod internals** (`def`) for checks; pinned to common Zod patterns. If Zod changes internals, the introspector may require adjustments.
-* Dates are stored as `Date` in form state; `<input type="date">` converts to/from local midnight.
-* Enum UI defaults to Select; set `meta[field].widget = "radio"` for radio groups.
+Despite the limitations, the component is already useful for quickly visualising the overall shape of large schemas while we iterate
+on richer form-generation features.
