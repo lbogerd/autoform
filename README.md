@@ -12,6 +12,8 @@ feeding it with the output of [`z.toJSONSchema`](https://zod.dev/?id=json-schema
 directly renderable (`replaceRefs` in [`auto-form.tsx`](src/components/autoform/auto-form.tsx)).
 - **Renderer:** [`AutoField`](src/components/autoform/auto-field.tsx) picks a basic control for each property based on its `type`,
 `format`, and helpers like `enum`, `anyOf`, and `additionalProperties`.
+- **Hook-based Form:** [`HookAutoForm`](src/components/autoform/hook-auto-form.tsx) integrates with React Hook Form and, as of this
+update, visually marks required fields based on the JSON Schema `required` array (part 1 of the required/validation feature).
 - **Status:** intentionally lightweight – there is no React Hook Form integration yet, and validation/submission wiring is out of
 scope for this prototype.
 
@@ -30,6 +32,19 @@ The renderer covers the pieces of JSON Schema that fall out of the Zod v4 conver
 and respect any `propertyNames.pattern` constraint for the key field.
 - `anyOf` chooses the first option for now (future work could surface all variants).
 - The literal `null` type renders as a static "null" placeholder.
+
+### Required fields (HookAutoForm)
+
+When using `HookAutoForm`:
+
+- Top-level required fields are determined from the schema's `required` array and are marked in the UI with an asterisk next to the
+  generated label.
+- The `aria-required` attribute is set to `true` on the underlying control for accessibility (inputs, checkboxes, and the Select
+  trigger).
+- For nested objects, the inner object's own `required` array is respected as well. Each nested field that is required gets the same
+  visual and ARIA treatment.
+- Array fields marked as required display the asterisk on the array property's label (per schema), while individual items continue to
+  render according to their item schema.
 
 The [`test/kitchen-sink-schema.ts`](test/kitchen-sink-schema.ts) fixture exercises most of these cases and provides the example
 schema used by the local demo page.
@@ -81,7 +96,8 @@ This is a prototype; important gaps remain:
 
 - Only the first branch of an `anyOf` is displayed.
 - Arrays are rendered as a single set of controls (no add/remove UI yet).
-- There is no form state library wiring, validation messages, labels, or submission handling.
+- AutoForm (non-hook) does not currently mark required fields. The required-field UI applies to HookAutoForm.
+- There is no validation for required fields yet (this is part 2). This update only covers visual indication and ARIA attributes.
 - Formats beyond the ones listed above fall back to plain inputs.
 - Complex widgets (files, discriminated unions, recursive data) need dedicated UX.
 
