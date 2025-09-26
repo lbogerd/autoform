@@ -25,9 +25,9 @@ export const HookAutoForm = ({
     useState<FieldValues | null>(null);
 
   const handleSubmit = form.handleSubmit((values) => {
-  const normalized = normalizeAnyOfValues(values) as FieldValues;
-  setLastSubmittedValues(normalized);
-  onSubmit?.(normalized);
+    const normalized = normalizeAnyOfValues(values) as FieldValues;
+    setLastSubmittedValues(normalized);
+    onSubmit?.(normalized);
   });
 
   const currentValues = form.watch();
@@ -96,7 +96,8 @@ function normalizeAnyOfValues(values: unknown): unknown {
   // Handle leaf anyOf container pattern: { __anyOf: [...], __anyOfIndex: "i" }
   if ("__anyOf" in obj && Array.isArray(obj.__anyOf)) {
     const idxRaw = obj.__anyOfIndex;
-    const idx = typeof idxRaw === "string" ? parseInt(idxRaw, 10) : Number(idxRaw ?? 0);
+    const idx =
+      typeof idxRaw === "string" ? parseInt(idxRaw, 10) : Number(idxRaw ?? 0);
     const chosen = obj.__anyOf[idx] ?? obj.__anyOf[0];
     return normalizeAnyOfValues(chosen);
   }
