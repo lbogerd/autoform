@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { HookAutoForm } from "../src/components/autoform/hook-auto-form";
 
@@ -148,5 +149,36 @@ describe("HookAutoForm required field marking", () => {
 
     const agreeCheckbox = screen.getByRole("checkbox");
     expect(agreeCheckbox).toHaveAttribute("aria-required", "true");
+  });
+
+  it("derives required markers from the zod schema when provided", () => {
+    render(
+      <HookAutoForm
+        schema={{
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            nickname: { type: "string" },
+          },
+          required: ["nickname"],
+        }}
+        zodSchema={z.object({
+          name: z.string(),
+          nickname: z.string().optional(),
+        })}
+      />
+    );
+
+  const nameLabel = document.querySelector('label[for="name"]') as HTMLLabelElement;
+  expect(nameLabel).toBeTruthy();
+  expect(nameLabel).toHaveTextContent(/name\*/i);
+    const nameInput = screen.getByLabelText(/name/i);
+    expect(nameInput).toHaveAttribute("aria-required", "true");
+
+  const nicknameLabel = document.querySelector('label[for="nickname"]') as HTMLLabelElement;
+  expect(nicknameLabel).toBeTruthy();
+  expect(nicknameLabel).not.toHaveTextContent(/\*$/);
+    const nicknameInput = screen.getByLabelText(/nickname/i);
+    expect(nicknameInput).not.toHaveAttribute("aria-required", "true");
   });
 });

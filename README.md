@@ -88,6 +88,32 @@ export function UserPreview() {
 The component automatically resolves `$ref` definitions before rendering, so schemas that reuse components (e.g. addresses) will
 show fully inlined fields.
 
+### Validation with Zod
+
+`HookAutoForm` can now accept a matching Zod schema via the optional `zodSchema` prop. When provided, the form validates through
+`react-hook-form`'s `zodResolver`, displays the first error message beneath each field, and marks invalid controls with
+`aria-invalid`/`aria-describedby`. Submit handlers receive the parsed Zod output (including any coercions or refinements), while the
+fallback behaviour without `zodSchema` remains unchanged.
+
+```tsx
+import { z } from "zod";
+
+const User = z.object({
+  name: z.string().min(1, "Name is required"),
+  age: z.coerce.number().int().min(0, "Age must be ≥ 0"),
+});
+
+<HookAutoForm
+  schema={userJsonSchema}
+  zodSchema={User}
+  validationMode="onChange"
+  onSubmit={(values) => console.log(values)}
+/>;
+```
+
+Required markers are derived from the Zod object shape when available (falling back to the JSON Schema `required` array otherwise),
+so stars and `aria-required` match the validation source of truth.
+
 ---
 
 ## Limitations & next steps
@@ -97,7 +123,8 @@ This is a prototype; important gaps remain:
 - Only the first branch of an `anyOf` is displayed.
 - Arrays are rendered as a single set of controls (no add/remove UI yet).
 - AutoForm (non-hook) does not currently mark required fields. The required-field UI applies to HookAutoForm.
-- There is no validation for required fields yet (this is part 2). This update only covers visual indication and ARIA attributes.
+- Validation now honours optional `zodSchema` definitions via React Hook Form; when omitted, the form remains unvalidated beyond the
+  existing JSON Schema hints.
 - Formats beyond the ones listed above fall back to plain inputs.
 - Complex widgets (files, discriminated unions, recursive data) need dedicated UX.
 

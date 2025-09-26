@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { HookAutoForm } from "../src/components/autoform/hook-auto-form";
 
@@ -242,6 +243,93 @@ describe("HookAutoForm", () => {
 
     expect(handleSubmit).toHaveBeenCalledTimes(1);
     expect(handleSubmit).toHaveBeenLastCalledWith({ choice: true });
+  });
+
+  it("validates with a provided zod schema and surfaces field errors", async () => {
+    const user = userEvent.setup();
+    const handleSubmit = vi.fn();
+
+    render(
+      <HookAutoForm
+        onSubmit={handleSubmit}
+        validationMode="onChange"
+        schema={{
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            age: { type: "integer" },
+          },
+        }}
+        zodSchema={z.object({
+          name: z.string().min(1, "Name required"),
+          age: z.coerce.number().int().min(0, "Age must be at least 0"),
+        })}
+      />
+    );
+
+    const nameInput = screen.getByLabelText(/name/i);
+    const ageInput = screen.getByLabelText(/age/i);
+
+    await user.type(nameInput, "A");
+    await user.clear(nameInput);
+  await user.type(ageInput, "-5");
+
+  expect(await screen.findByText("Name required")).toBeInTheDocument();
+  expect(await screen.findByText("Age must be at least 0")).toBeInTheDocument();
+    expect(nameInput).toHaveAttribute("aria-invalid", "true");
+    expect(ageInput).toHaveAttribute("aria-invalid", "true");
+
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    expect(handleSubmit).not.toHaveBeenCalled();
+
+  await user.type(nameInput, "Alice");
+    await user.clear(ageInput);
+    await user.type(ageInput, "24");
+
+    expect(screen.queryByText("Name required")).not.toBeInTheDocument();
+    expect(screen.queryByText("Age must be at least 0")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+    expect(handleSubmit).toHaveBeenCalledTimes(1);
+    expect(handleSubmit).toHaveBeenLastCalledWith({ name: "Alice", age: 24 });
+  });
+
+  it("normalizes anyOf selections before running zod validation", async () => {
+    const user = userEvent.setup();
+    const handleSubmit = vi.fn();
+
+    render(
+      <HookAutoForm
+        onSubmit={handleSubmit}
+        schema={{
+          type: "object",
+          properties: {
+            choice: {
+              anyOf: [
+                { type: "string", title: "Text" },
+                { type: "integer", title: "Number" },
+              ],
+            },
+          },
+          required: ["choice"],
+        }}
+        zodSchema={z.object({
+          choice: z.union([
+            z.string().min(2, "Text too short"),
+            z.number().min(1, "Number too small"),
+          ]),
+        })}
+      />
+    );
+
+    await user.click(screen.getByRole("tab", { name: /number/i }));
+    const numberInput = screen.getByLabelText(/choice/i);
+    await user.clear(numberInput);
+    await user.type(numberInput, "2");
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(handleSubmit).toHaveBeenCalledTimes(1);
+    expect(handleSubmit).toHaveBeenLastCalledWith({ choice: 2 });
   });
 
   it("normalizes nested anyOf within an object to match schema shape", async () => {

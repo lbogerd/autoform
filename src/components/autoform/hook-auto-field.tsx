@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Controller,
   useFieldArray,
   useFormContext,
+  type FieldError,
   type FieldValues,
 } from "react-hook-form";
 
@@ -19,6 +20,12 @@ import {
 import type { JsonProperty } from "./types";
 import type { _JSONSchema } from "node_modules/zod/v4/core/json-schema.d.cts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import {
+  getChildError,
+  getFieldErrorMessage,
+  sanitizeErrorId,
+  type FieldErrorLike,
+} from "./error-utils";
 
 const resolveSchema = (
   schema: JsonProperty | _JSONSchema
@@ -76,9 +83,11 @@ const getDefaultValueForSchema = (
 const HookArrayField = ({
   name,
   itemSchema,
+  error,
 }: {
   name: string;
   itemSchema: JsonProperty | _JSONSchema;
+  error?: FieldErrorLike;
 }) => {
   const resolvedItemSchema = useMemo(
     () => resolveSchema(itemSchema),
@@ -108,6 +117,7 @@ const HookArrayField = ({
               <HookAutoField
                 name={`${name}.${index}`}
                 jsonProperty={resolvedItemSchema}
+                error={getChildError(error, index)}
               />
             </div>
             <Button type="button" variant="ghost" onClick={() => remove(index)}>
@@ -132,13 +142,45 @@ export const HookAutoField = ({
   jsonProperty,
   required,
   inputId,
+  error,
+  errorId,
+  showInlineError = true,
 }: {
   name: string;
   jsonProperty: JsonProperty | _JSONSchema;
   required?: boolean;
   inputId?: string;
+  error?: FieldErrorLike;
+  errorId?: string;
+  showInlineError?: boolean;
 }) => {
   const { control, register } = useFormContext<FieldValues>();
+  const aggregatedMessage = getFieldErrorMessage(error);
+  const ownMessage = getOwnErrorMessage(error);
+  const inlineMessage = showInlineError ? ownMessage : undefined;
+  const inlineErrorId =
+    showInlineError && inlineMessage
+      ? errorId ?? sanitizeErrorId(name)
+      : errorId;
+  const describedBy = inlineErrorId ?? undefined;
+  const isInvalid = Boolean(aggregatedMessage);
+
+  const wrapWithInlineError = (node: ReactNode) => {
+    if (!showInlineError) {
+      return node;
+    }
+
+    return (
+      <>
+        {node}
+        {inlineMessage ? (
+          <p id={inlineErrorId} className="text-xs text-destructive">
+            {inlineMessage}
+          </p>
+        ) : null}
+      </>
+    );
+  };
 
   // Handle anyOf BEFORE resolving the schema to first option
   if (
@@ -153,6 +195,9 @@ export const HookAutoField = ({
         parentName={name}
         options={jsonProperty.anyOf}
         required={required}
+        error={error}
+        errorId={inlineErrorId}
+        showInlineError={showInlineError}
       />
     );
   }
@@ -179,7 +224,7 @@ export const HookAutoField = ({
       value: option,
     }));
 
-    return (
+    return wrapWithInlineError(
       <Controller
         control={control}
         name={name}
@@ -196,7 +241,11 @@ export const HookAutoField = ({
                 field.onChange(match?.value ?? value);
               }}
             >
-              <SelectTrigger aria-required={required}>
+              <SelectTrigger
+                aria-required={required}
+                aria-invalid={isInvalid ? true : undefined}
+                aria-describedby={describedBy}
+              >
                 <SelectValue placeholder="Select value..." />
               </SelectTrigger>
               <SelectContent>
@@ -224,18 +273,30 @@ export const HookAutoField = ({
       ).items;
 
       if (!items) {
-        return <span className="text-muted-foreground">[]</span>;
+        return wrapWithInlineError(
+          <span className="text-muted-foreground">[]</span>
+        );
       }
 
       if (Array.isArray(items)) {
-        return <HookArrayField name={name} itemSchema={items[0] ?? {}} />;
+        return wrapWithInlineError(
+          <HookArrayField name={name} itemSchema={items[0] ?? {}} error={error} />
+        );
       }
 
       if (items === true) {
-        return <HookArrayField name={name} itemSchema={{ type: "string" }} />;
+        return wrapWithInlineError(
+          <HookArrayField
+            name={name}
+            itemSchema={{ type: "string" }}
+            error={error}
+          />
+        );
       }
 
-      return <HookArrayField name={name} itemSchema={items} />;
+      return wrapWithInlineError(
+        <HookArrayField name={name} itemSchema={items} error={error} />
+      );
     }
 
     case "object": {
@@ -251,7 +312,7 @@ export const HookAutoField = ({
       );
 
       if (properties && Object.keys(properties).length > 0) {
-        return (
+        return wrapWithInlineError(
           <ul className="space-y-3 rounded-md border p-4">
             {Object.entries(properties).map(([key, value]) => (
               <li key={key} className="space-y-2">
@@ -268,6 +329,7 @@ export const HookAutoField = ({
                   name={`${name}.${key}`}
                   jsonProperty={value}
                   required={requiredKeys.has(key)}
+                  error={getChildError(error, key)}
                 />
               </li>
             ))}
@@ -276,75 +338,90 @@ export const HookAutoField = ({
       }
 
       if ("additionalProperties" in schema) {
-        return (
+        return wrapWithInlineError(
           <span className="text-muted-foreground">
             Record-style objects are not yet supported in HookAutoForm.
           </span>
         );
       }
 
-      return <span className="text-muted-foreground">{`{ }`}</span>;
+      return wrapWithInlineError(
+        <span className="text-muted-foreground">{`{ }`}</span>
+      );
     }
 
     case "string": {
       const format = Object.prototype.hasOwnProperty.call(schema, "format")
         ? (schema as { format?: string }).format
         : undefined;
+      const stringRegistration = register(name);
 
       switch (format) {
         case "email":
-          return (
+          return wrapWithInlineError(
             <Input
               id={inputId ?? name}
               type="email"
               aria-required={required}
-              {...register(name)}
+              aria-invalid={isInvalid ? true : undefined}
+              aria-describedby={describedBy}
+              {...stringRegistration}
             />
           );
         case "uri":
-          return (
+          return wrapWithInlineError(
             <Input
               id={inputId ?? name}
               type="url"
               aria-required={required}
-              {...register(name)}
+              aria-invalid={isInvalid ? true : undefined}
+              aria-describedby={describedBy}
+              {...stringRegistration}
             />
           );
         case "date-time":
-          return (
+          return wrapWithInlineError(
             <Input
               id={inputId ?? name}
               type="datetime-local"
               aria-required={required}
-              {...register(name)}
+              aria-invalid={isInvalid ? true : undefined}
+              aria-describedby={describedBy}
+              {...stringRegistration}
             />
           );
         case "date":
-          return (
+          return wrapWithInlineError(
             <Input
               id={inputId ?? name}
               type="date"
               aria-required={required}
-              {...register(name)}
+              aria-invalid={isInvalid ? true : undefined}
+              aria-describedby={describedBy}
+              {...stringRegistration}
             />
           );
         case "time":
-          return (
+          return wrapWithInlineError(
             <Input
               id={inputId ?? name}
               type="time"
               step={1}
               aria-required={required}
-              {...register(name)}
+              aria-invalid={isInvalid ? true : undefined}
+              aria-describedby={describedBy}
+              {...stringRegistration}
             />
           );
         default:
-          return (
+          return wrapWithInlineError(
             <Input
               id={inputId ?? name}
               type="text"
               aria-required={required}
-              {...register(name)}
+              aria-invalid={isInvalid ? true : undefined}
+              aria-describedby={describedBy}
+              {...stringRegistration}
             />
           );
       }
@@ -352,17 +429,19 @@ export const HookAutoField = ({
 
     case "number":
     case "integer":
-      return (
+      return wrapWithInlineError(
         <Input
           id={inputId ?? name}
           type="number"
           aria-required={required}
+          aria-invalid={isInvalid ? true : undefined}
+          aria-describedby={describedBy}
           {...register(name, { valueAsNumber: true })}
         />
       );
 
     case "boolean":
-      return (
+      return wrapWithInlineError(
         <Controller
           control={control}
           name={name}
@@ -371,6 +450,8 @@ export const HookAutoField = ({
               id={inputId ?? name}
               checked={Boolean(field.value)}
               aria-required={required}
+              aria-invalid={isInvalid ? true : undefined}
+              aria-describedby={describedBy}
               onCheckedChange={(checked) => field.onChange(Boolean(checked))}
             />
           )}
@@ -378,21 +459,45 @@ export const HookAutoField = ({
       );
 
     case "null":
-      return <span className="font-mono">null</span>;
+      return wrapWithInlineError(<span className="font-mono">null</span>);
 
     default:
-      return <span>Unsupported field type: {JSON.stringify(schema)}</span>;
+      return wrapWithInlineError(
+        <span>Unsupported field type: {JSON.stringify(schema)}</span>
+      );
   }
 };
+
+function getOwnErrorMessage(error: FieldErrorLike): string | undefined {
+  if (!error || Array.isArray(error) || typeof error !== "object") {
+    return undefined;
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(error, "message") &&
+    typeof (error as FieldError).message === "string" &&
+    (error as FieldError).message
+  ) {
+    return (error as FieldError).message;
+  }
+
+  return undefined;
+}
 
 function HookAnyOfTabs({
   parentName,
   options,
   required,
+  error,
+  errorId,
+  showInlineError = true,
 }: {
   parentName: string;
   options: Array<JsonProperty | _JSONSchema>;
   required?: boolean;
+  error?: FieldErrorLike;
+  errorId?: string;
+  showInlineError?: boolean;
 }) {
   const [active, setActive] = useState("0");
   const { setValue, getValues } = useFormContext<FieldValues>();
@@ -443,6 +548,9 @@ function HookAnyOfTabs({
             jsonProperty={opt}
             required={required}
             inputId={parentName}
+            error={error}
+            errorId={errorId}
+            showInlineError={showInlineError}
           />
         </TabsContent>
       ))}
