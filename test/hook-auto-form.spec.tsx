@@ -272,22 +272,26 @@ describe("HookAutoForm", () => {
 
     await user.type(nameInput, "A");
     await user.clear(nameInput);
-  await user.type(ageInput, "-5");
+    await user.type(ageInput, "-5");
 
-  expect(await screen.findByText("Name required")).toBeInTheDocument();
-  expect(await screen.findByText("Age must be at least 0")).toBeInTheDocument();
+    expect(await screen.findByText("Name required")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Age must be at least 0")
+    ).toBeInTheDocument();
     expect(nameInput).toHaveAttribute("aria-invalid", "true");
     expect(ageInput).toHaveAttribute("aria-invalid", "true");
 
     await user.click(screen.getByRole("button", { name: "Submit" }));
     expect(handleSubmit).not.toHaveBeenCalled();
 
-  await user.type(nameInput, "Alice");
+    await user.type(nameInput, "Alice");
     await user.clear(ageInput);
     await user.type(ageInput, "24");
 
     expect(screen.queryByText("Name required")).not.toBeInTheDocument();
-    expect(screen.queryByText("Age must be at least 0")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Age must be at least 0")
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Submit" }));
     expect(handleSubmit).toHaveBeenCalledTimes(1);

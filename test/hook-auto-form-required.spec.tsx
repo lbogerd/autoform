@@ -169,15 +169,19 @@ describe("HookAutoForm required field marking", () => {
       />
     );
 
-  const nameLabel = document.querySelector('label[for="name"]') as HTMLLabelElement;
-  expect(nameLabel).toBeTruthy();
-  expect(nameLabel).toHaveTextContent(/name\*/i);
+    const nameLabel = document.querySelector(
+      'label[for="name"]'
+    ) as HTMLLabelElement;
+    expect(nameLabel).toBeTruthy();
+    expect(nameLabel).toHaveTextContent(/name\*/i);
     const nameInput = screen.getByLabelText(/name/i);
     expect(nameInput).toHaveAttribute("aria-required", "true");
 
-  const nicknameLabel = document.querySelector('label[for="nickname"]') as HTMLLabelElement;
-  expect(nicknameLabel).toBeTruthy();
-  expect(nicknameLabel).not.toHaveTextContent(/\*$/);
+    const nicknameLabel = document.querySelector(
+      'label[for="nickname"]'
+    ) as HTMLLabelElement;
+    expect(nicknameLabel).toBeTruthy();
+    expect(nicknameLabel).not.toHaveTextContent(/\*$/);
     const nicknameInput = screen.getByLabelText(/nickname/i);
     expect(nicknameInput).not.toHaveAttribute("aria-required", "true");
   });

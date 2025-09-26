@@ -39,7 +39,9 @@ export const HookAutoForm = ({
     if (!zodSchema) {
       return undefined;
     }
-    const baseResolver = zodResolver(zodSchema as never) as Resolver<FieldValues>;
+    const baseResolver = zodResolver(
+      zodSchema as never
+    ) as Resolver<FieldValues>;
     return withAnyOfNormalization(baseResolver);
   }, [zodSchema]);
 
@@ -60,7 +62,10 @@ export const HookAutoForm = ({
   });
 
   const currentValues = form.watch();
-  const zodRequired = useMemo(() => inferRequiredFromZod(zodSchema), [zodSchema]);
+  const zodRequired = useMemo(
+    () => inferRequiredFromZod(zodSchema),
+    [zodSchema]
+  );
   const requiredFields = new Set(
     zodRequired && zodRequired.length > 0
       ? zodRequired
@@ -69,7 +74,7 @@ export const HookAutoForm = ({
 
   return (
     <FormProvider {...form}>
-  <form className="space-y-6" onSubmit={handleSubmit} noValidate>
+      <form className="space-y-6" onSubmit={handleSubmit} noValidate>
         <ul className="space-y-4">
           {Object.entries(resolvedSchema.properties ?? {}).map(
             ([key, value]) => (
@@ -211,25 +216,23 @@ function inferRequiredFromZod(zodSchema?: ZodTypeAny): string[] {
   let current: ZodTypeAny | undefined = zodSchema;
   const safeguard = 10;
   for (let depth = 0; depth < safeguard && current; depth += 1) {
-    const meta = (
-      ((current as unknown as { def?: unknown }).def ??
-        (current as unknown as { _def?: unknown })._def) as
-        | {
-            type?: string;
-            shape?: unknown;
-            innerType?: ZodTypeAny;
-            getter?: () => ZodTypeAny;
-            upstream?: ZodTypeAny;
-          }
-        | undefined
-    );
+    const meta = ((current as unknown as { def?: unknown }).def ??
+      (current as unknown as { _def?: unknown })._def) as
+      | {
+          type?: string;
+          shape?: unknown;
+          innerType?: ZodTypeAny;
+          getter?: () => ZodTypeAny;
+          upstream?: ZodTypeAny;
+        }
+      | undefined;
     if (!meta || typeof meta !== "object") {
       return [];
     }
 
     const type = meta.type;
     if (type === "object") {
-  const shapeRaw = meta.shape;
+      const shapeRaw = meta.shape;
       const shape =
         typeof shapeRaw === "function"
           ? (shapeRaw as () => Record<string, unknown>)()

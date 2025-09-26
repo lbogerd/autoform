@@ -280,7 +280,11 @@ export const HookAutoField = ({
 
       if (Array.isArray(items)) {
         return wrapWithInlineError(
-          <HookArrayField name={name} itemSchema={items[0] ?? {}} error={error} />
+          <HookArrayField
+            name={name}
+            itemSchema={items[0] ?? {}}
+            error={error}
+          />
         );
       }
 
