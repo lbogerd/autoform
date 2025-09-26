@@ -2,7 +2,9 @@
 
 AutoForm is an experiment that renders a very small set of UI controls directly from a JSON Schema document. The current focus is
 feeding it with the output of [`z.toJSONSchema`](https://zod.dev/?id=json-schema) from **Zod v4**, so we can preview large schemas
-(such as the "kitchen sink" test schema) without hand-coding every field.
+(such as the "kitchen sink" test schema) without hand-coding every field. If you would rather skip the manual conversion step, you
+can use the companion `ZodAutoForm` wrapper to generate the JSON Schema under the hood (with first-class support for native `Date`
+values).
 
 ---
 
@@ -52,30 +54,14 @@ schema used by the local demo page.
 
 ## Usage
 
-### 1. Produce JSON Schema (Zod v4 example)
+### Option A — Provide JSON Schema directly
 
-```ts
-import { z } from "zod";
-
-const User = z.object({
-  name: z.string().min(1),
-  email: z.email(),
-  website: z.string().url().optional(),
-  tags: z.array(z.string()).min(1),
-  role: z.enum(["admin", "editor", "viewer"]),
-});
-
-const userJsonSchema = z.toJSONSchema(User, { reused: "ref" });
-```
-
-`z.toJSONSchema` is optional; any JSON Schema object with the shapes listed above will work.
-
-### 2. Render the form
+If you already have a JSON Schema definition (or you want to control the conversion yourself), pass it straight into `AutoForm`.
 
 ```tsx
 import { AutoForm } from "@/components/autoform/auto-form";
 
-export function UserPreview() {
+export function UserPreview({ userJsonSchema }: { userJsonSchema: JsonSchema }) {
   return (
     <div className="max-w-xl space-y-4">
       <AutoForm schema={userJsonSchema} />
@@ -86,6 +72,36 @@ export function UserPreview() {
 
 The component automatically resolves `$ref` definitions before rendering, so schemas that reuse components (e.g. addresses) will
 show fully inlined fields.
+
+### Option B — Use `ZodAutoForm` with a Zod v4 schema
+
+```tsx
+import { ZodAutoForm } from "@/components/autoform/zod-auto-form";
+import { z } from "zod";
+
+const Appointment = z.object({
+  topic: z.string().min(1),
+  startsAt: z.date(),
+  followUpOn: z.date().optional(),
+});
+
+export function AppointmentPreview() {
+  return (
+    <div className="max-w-xl space-y-4">
+      <ZodAutoForm
+        schema={Appointment}
+        defaultValues={{
+          topic: "Quarterly sync",
+          startsAt: new Date(),
+        }}
+      />
+    </div>
+  );
+}
+```
+
+`ZodAutoForm` converts the schema with `z.toJSONSchema` for you (defaulting to `{ reused: "ref" }`) and augments `z.date()` fields
+so that the generated form reads and writes native `Date` instances automatically.
 
 ---
 

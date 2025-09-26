@@ -93,6 +93,7 @@ export const AutoForm = ({
 
 function normalizeAnyOfValues(values: unknown): unknown {
   if (values == null || typeof values !== "object") return values;
+  if (values instanceof Date) return values;
 
   if (Array.isArray(values)) {
     return values.map((v) => normalizeAnyOfValues(v));
