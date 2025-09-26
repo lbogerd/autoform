@@ -196,6 +196,14 @@ export const AutoField = ({
 
   // anyOf handled above
 
+  const isNativeDate =
+    typeof schema === "object" &&
+    schema !== null &&
+    "x-autoform-nativeType" in schema &&
+    (schema as { "x-autoform-nativeType"?: unknown })[
+      "x-autoform-nativeType"
+    ] === "date";
+
   const appendValidationMessage = (node: ReactNode) => (
     <>
       {node}
@@ -381,6 +389,34 @@ export const AutoField = ({
             />
           );
         case "date-time":
+          if (isNativeDate) {
+            return appendValidationMessage(
+              <Controller
+                control={control}
+                name={name}
+                rules={validationRules}
+                render={({ field }) => (
+                  <Input
+                    id={inputId ?? name}
+                    type="datetime-local"
+                    value={formatDateTimeLocal(field.value)}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (!value) {
+                        field.onChange(undefined);
+                        return;
+                      }
+                      field.onChange(parseDateTimeLocal(value));
+                    }}
+                    onBlur={field.onBlur}
+                    aria-required={required}
+                    aria-invalid={invalid || undefined}
+                    aria-describedby={describedBy}
+                  />
+                )}
+              />
+            );
+          }
           return appendValidationMessage(
             <Input
               id={inputId ?? name}
@@ -392,6 +428,34 @@ export const AutoField = ({
             />
           );
         case "date":
+          if (isNativeDate) {
+            return appendValidationMessage(
+              <Controller
+                control={control}
+                name={name}
+                rules={validationRules}
+                render={({ field }) => (
+                  <Input
+                    id={inputId ?? name}
+                    type="date"
+                    value={formatDateOnly(field.value)}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (!value) {
+                        field.onChange(undefined);
+                        return;
+                      }
+                      field.onChange(parseDateOnly(value));
+                    }}
+                    onBlur={field.onBlur}
+                    aria-required={required}
+                    aria-invalid={invalid || undefined}
+                    aria-describedby={describedBy}
+                  />
+                )}
+              />
+            );
+          }
           return appendValidationMessage(
             <Input
               id={inputId ?? name}
@@ -537,4 +601,56 @@ function AnyOfTabs({
       ))}
     </Tabs>
   );
+}
+
+const padNumber = (value: number, length = 2) =>
+  value.toString().padStart(length, "0");
+
+function formatDateTimeLocal(value: unknown): string {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const year = value.getFullYear();
+    const month = padNumber(value.getMonth() + 1);
+    const day = padNumber(value.getDate());
+    const hours = padNumber(value.getHours());
+    const minutes = padNumber(value.getMinutes());
+    const seconds = padNumber(value.getSeconds());
+    const milliseconds = value.getMilliseconds();
+
+    let formatted = `${year}-${month}-${day}T${hours}:${minutes}`;
+    if (seconds !== 0 || milliseconds !== 0) {
+      formatted += `:${padNumber(seconds)}`;
+      if (milliseconds !== 0) {
+        formatted += `.${padNumber(milliseconds, 3)}`;
+      }
+    }
+
+    return formatted;
+  }
+
+  if (typeof value === "string") return value;
+  return "";
+}
+
+function parseDateTimeLocal(value: string): Date | undefined {
+  if (!value) return undefined;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
+function formatDateOnly(value: unknown): string {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const year = value.getFullYear();
+    const month = padNumber(value.getMonth() + 1);
+    const day = padNumber(value.getDate());
+    return `${year}-${month}-${day}`;
+  }
+
+  if (typeof value === "string") return value;
+  return "";
+}
+
+function parseDateOnly(value: string): Date | undefined {
+  if (!value) return undefined;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 }
