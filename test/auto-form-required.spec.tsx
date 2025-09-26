@@ -3,7 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { HookAutoForm } from "../src/components/autoform/hook-auto-form";
+import { AutoForm } from "../src/components/autoform/auto-form";
 
 beforeAll(() => {
   class MockResizeObserver {
@@ -25,10 +25,10 @@ afterEach(() => {
   cleanup();
 });
 
-describe("HookAutoForm required field marking", () => {
+describe("AutoForm required field marking", () => {
   it("marks top-level required fields with an asterisk and sets aria-required on inputs", () => {
     render(
-      <HookAutoForm
+      <AutoForm
         schema={{
           type: "object",
           properties: {
@@ -59,7 +59,7 @@ describe("HookAutoForm required field marking", () => {
 
   it("marks nested required object fields and propagates aria-required", async () => {
     render(
-      <HookAutoForm
+      <AutoForm
         schema={{
           type: "object",
           properties: {
@@ -102,7 +102,7 @@ describe("HookAutoForm required field marking", () => {
   it("marks required array fields at the property label", async () => {
     const user = userEvent.setup();
     render(
-      <HookAutoForm
+      <AutoForm
         schema={{
           type: "object",
           properties: {
@@ -124,7 +124,7 @@ describe("HookAutoForm required field marking", () => {
 
   it("adds aria-required to selects and checkboxes when required", async () => {
     render(
-      <HookAutoForm
+      <AutoForm
         schema={{
           type: "object",
           properties: {

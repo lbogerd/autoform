@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { HookAutoForm } from "../src/components/autoform/hook-auto-form";
+import { AutoForm } from "../src/components/autoform/auto-form";
 
 beforeAll(() => {
   class MockResizeObserver {
@@ -21,10 +21,10 @@ afterEach(() => {
   cleanup();
 });
 
-describe("HookAutoForm", () => {
+describe("AutoForm", () => {
   it("resolves $ref entries before rendering inputs", () => {
     render(
-      <HookAutoForm
+      <AutoForm
         schema={{
           type: "object",
           $defs: {
@@ -45,7 +45,7 @@ describe("HookAutoForm", () => {
     const handleSubmit = vi.fn();
 
     render(
-      <HookAutoForm
+      <AutoForm
         onSubmit={handleSubmit}
         schema={{
           type: "object",
@@ -70,7 +70,7 @@ describe("HookAutoForm", () => {
     const user = userEvent.setup();
 
     render(
-      <HookAutoForm
+      <AutoForm
         schema={{
           type: "object",
           properties: {
@@ -109,7 +109,7 @@ describe("HookAutoForm", () => {
     const user = userEvent.setup();
 
     render(
-      <HookAutoForm
+      <AutoForm
         schema={{
           type: "object",
           properties: {
@@ -155,7 +155,7 @@ describe("HookAutoForm", () => {
     const user = userEvent.setup();
 
     render(
-      <HookAutoForm
+      <AutoForm
         schema={{
           type: "object",
           properties: {
@@ -188,7 +188,7 @@ describe("HookAutoForm", () => {
     const user = userEvent.setup();
 
     render(
-      <HookAutoForm
+      <AutoForm
         schema={{
           type: "object",
           properties: {
@@ -217,7 +217,7 @@ describe("HookAutoForm", () => {
     const handleSubmit = vi.fn();
 
     render(
-      <HookAutoForm
+      <AutoForm
         onSubmit={handleSubmit}
         schema={{
           type: "object",
@@ -249,7 +249,7 @@ describe("HookAutoForm", () => {
     const handleSubmit = vi.fn();
 
     render(
-      <HookAutoForm
+      <AutoForm
         onSubmit={handleSubmit}
         schema={{
           type: "object",
@@ -290,7 +290,7 @@ describe("HookAutoForm", () => {
     const user = userEvent.setup();
 
     render(
-      <HookAutoForm
+      <AutoForm
         schema={{
           type: "object",
           properties: {
@@ -323,7 +323,7 @@ describe("HookAutoForm", () => {
     const user = userEvent.setup();
 
     render(
-      <HookAutoForm
+      <AutoForm
         schema={{
           type: "object",
           properties: {
@@ -354,7 +354,7 @@ describe("HookAutoForm", () => {
     const user = userEvent.setup();
 
     render(
-      <HookAutoForm
+      <AutoForm
         schema={{
           type: "object",
           properties: {
