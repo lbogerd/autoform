@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import {
   Controller,
   useFieldArray,
   useFormContext,
+  useFormState,
+  type FieldPath,
   type FieldValues,
 } from "react-hook-form";
 
@@ -16,6 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import {
+  ValidationMessage,
+  type ValidationMessageProps,
+} from "../ui/validation-message";
 import type { JsonProperty } from "./types";
 import type { _JSONSchema } from "node_modules/zod/v4/core/json-schema.d.cts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
@@ -76,9 +83,11 @@ const getDefaultValueForSchema = (
 const HookArrayField = ({
   name,
   itemSchema,
+  validationMessageProps,
 }: {
   name: string;
   itemSchema: JsonProperty | _JSONSchema;
+  validationMessageProps?: Partial<Omit<ValidationMessageProps, "name" | "id">>;
 }) => {
   const resolvedItemSchema = useMemo(
     () => resolveSchema(itemSchema),
@@ -108,6 +117,7 @@ const HookArrayField = ({
               <HookAutoField
                 name={`${name}.${index}`}
                 jsonProperty={resolvedItemSchema}
+                validationMessageProps={validationMessageProps}
               />
             </div>
             <Button type="button" variant="ghost" onClick={() => remove(index)}>
@@ -132,13 +142,29 @@ export const HookAutoField = ({
   jsonProperty,
   required,
   inputId,
+  validationMessageProps,
 }: {
   name: string;
   jsonProperty: JsonProperty | _JSONSchema;
   required?: boolean;
   inputId?: string;
+  validationMessageProps?: Partial<Omit<ValidationMessageProps, "name" | "id">>;
 }) => {
-  const { control, register } = useFormContext<FieldValues>();
+  const { control, register, getFieldState } = useFormContext<FieldValues>();
+  const formState = useFormState({ name });
+  const fieldName = name as FieldPath<FieldValues>;
+  const fieldState = getFieldState(fieldName, formState);
+  const { error, invalid } = fieldState;
+
+  const baseId = inputId ?? name;
+  const sanitizedId = baseId.replace(/[^a-zA-Z0-9_-]+/g, "-");
+  const messageId = `${sanitizedId}-error`;
+  const describedBy = error ? messageId : undefined;
+
+  const validationRules = useMemo(() => {
+    if (!required) return undefined;
+    return { required: "This field is required." } as const;
+  }, [required]);
 
   // Handle anyOf BEFORE resolving the schema to first option
   if (
@@ -153,6 +179,7 @@ export const HookAutoField = ({
         parentName={name}
         options={jsonProperty.anyOf}
         required={required}
+        validationMessageProps={validationMessageProps}
       />
     );
   }
@@ -169,6 +196,17 @@ export const HookAutoField = ({
 
   // anyOf handled above
 
+  const appendValidationMessage = (node: ReactNode) => (
+    <>
+      {node}
+      <ValidationMessage
+        name={fieldName}
+        id={messageId}
+        {...validationMessageProps}
+      />
+    </>
+  );
+
   if (
     "enum" in schema &&
     Array.isArray(schema.enum) &&
@@ -179,10 +217,11 @@ export const HookAutoField = ({
       value: option,
     }));
 
-    return (
+    return appendValidationMessage(
       <Controller
         control={control}
         name={name}
+        rules={validationRules}
         render={({ field }) => {
           const selected = options.find((option) =>
             Object.is(option.value, field.value)
@@ -196,7 +235,11 @@ export const HookAutoField = ({
                 field.onChange(match?.value ?? value);
               }}
             >
-              <SelectTrigger aria-required={required}>
+              <SelectTrigger
+                aria-required={required}
+                aria-invalid={invalid || undefined}
+                aria-describedby={describedBy}
+              >
                 <SelectValue placeholder="Select value..." />
               </SelectTrigger>
               <SelectContent>
@@ -224,18 +267,38 @@ export const HookAutoField = ({
       ).items;
 
       if (!items) {
-        return <span className="text-muted-foreground">[]</span>;
+        return appendValidationMessage(
+          <span className="text-muted-foreground">[]</span>
+        );
       }
 
       if (Array.isArray(items)) {
-        return <HookArrayField name={name} itemSchema={items[0] ?? {}} />;
+        return appendValidationMessage(
+          <HookArrayField
+            name={name}
+            itemSchema={items[0] ?? {}}
+            validationMessageProps={validationMessageProps}
+          />
+        );
       }
 
       if (items === true) {
-        return <HookArrayField name={name} itemSchema={{ type: "string" }} />;
+        return appendValidationMessage(
+          <HookArrayField
+            name={name}
+            itemSchema={{ type: "string" }}
+            validationMessageProps={validationMessageProps}
+          />
+        );
       }
 
-      return <HookArrayField name={name} itemSchema={items} />;
+      return appendValidationMessage(
+        <HookArrayField
+          name={name}
+          itemSchema={items}
+          validationMessageProps={validationMessageProps}
+        />
+      );
     }
 
     case "object": {
@@ -251,7 +314,7 @@ export const HookAutoField = ({
       );
 
       if (properties && Object.keys(properties).length > 0) {
-        return (
+        return appendValidationMessage(
           <ul className="space-y-3 rounded-md border p-4">
             {Object.entries(properties).map(([key, value]) => (
               <li key={key} className="space-y-2">
@@ -268,6 +331,7 @@ export const HookAutoField = ({
                   name={`${name}.${key}`}
                   jsonProperty={value}
                   required={requiredKeys.has(key)}
+                  validationMessageProps={validationMessageProps}
                 />
               </li>
             ))}
@@ -276,14 +340,16 @@ export const HookAutoField = ({
       }
 
       if ("additionalProperties" in schema) {
-        return (
+        return appendValidationMessage(
           <span className="text-muted-foreground">
             Record-style objects are not yet supported in HookAutoForm.
           </span>
         );
       }
 
-      return <span className="text-muted-foreground">{`{ }`}</span>;
+      return appendValidationMessage(
+        <span className="text-muted-foreground">{`{ }`}</span>
+      );
     }
 
     case "string": {
@@ -293,58 +359,70 @@ export const HookAutoField = ({
 
       switch (format) {
         case "email":
-          return (
+          return appendValidationMessage(
             <Input
               id={inputId ?? name}
               type="email"
               aria-required={required}
-              {...register(name)}
+              aria-invalid={invalid || undefined}
+              aria-describedby={describedBy}
+              {...register(fieldName, validationRules)}
             />
           );
         case "uri":
-          return (
+          return appendValidationMessage(
             <Input
               id={inputId ?? name}
               type="url"
               aria-required={required}
-              {...register(name)}
+              aria-invalid={invalid || undefined}
+              aria-describedby={describedBy}
+              {...register(fieldName, validationRules)}
             />
           );
         case "date-time":
-          return (
+          return appendValidationMessage(
             <Input
               id={inputId ?? name}
               type="datetime-local"
               aria-required={required}
-              {...register(name)}
+              aria-invalid={invalid || undefined}
+              aria-describedby={describedBy}
+              {...register(fieldName, validationRules)}
             />
           );
         case "date":
-          return (
+          return appendValidationMessage(
             <Input
               id={inputId ?? name}
               type="date"
               aria-required={required}
-              {...register(name)}
+              aria-invalid={invalid || undefined}
+              aria-describedby={describedBy}
+              {...register(fieldName, validationRules)}
             />
           );
         case "time":
-          return (
+          return appendValidationMessage(
             <Input
               id={inputId ?? name}
               type="time"
               step={1}
               aria-required={required}
-              {...register(name)}
+              aria-invalid={invalid || undefined}
+              aria-describedby={describedBy}
+              {...register(fieldName, validationRules)}
             />
           );
         default:
-          return (
+          return appendValidationMessage(
             <Input
               id={inputId ?? name}
               type="text"
               aria-required={required}
-              {...register(name)}
+              aria-invalid={invalid || undefined}
+              aria-describedby={describedBy}
+              {...register(fieldName, validationRules)}
             />
           );
       }
@@ -352,25 +430,33 @@ export const HookAutoField = ({
 
     case "number":
     case "integer":
-      return (
+      return appendValidationMessage(
         <Input
           id={inputId ?? name}
           type="number"
           aria-required={required}
-          {...register(name, { valueAsNumber: true })}
+          aria-invalid={invalid || undefined}
+          aria-describedby={describedBy}
+          {...register(fieldName, {
+            valueAsNumber: true,
+            ...(validationRules ?? {}),
+          })}
         />
       );
 
     case "boolean":
-      return (
+      return appendValidationMessage(
         <Controller
           control={control}
           name={name}
+          rules={validationRules}
           render={({ field }) => (
             <Checkbox
               id={inputId ?? name}
               checked={Boolean(field.value)}
               aria-required={required}
+              aria-invalid={invalid || undefined}
+              aria-describedby={describedBy}
               onCheckedChange={(checked) => field.onChange(Boolean(checked))}
             />
           )}
@@ -378,7 +464,7 @@ export const HookAutoField = ({
       );
 
     case "null":
-      return <span className="font-mono">null</span>;
+      return appendValidationMessage(<span className="font-mono">null</span>);
 
     default:
       return <span>Unsupported field type: {JSON.stringify(schema)}</span>;
@@ -389,10 +475,12 @@ function HookAnyOfTabs({
   parentName,
   options,
   required,
+  validationMessageProps,
 }: {
   parentName: string;
   options: Array<JsonProperty | _JSONSchema>;
   required?: boolean;
+  validationMessageProps?: Partial<Omit<ValidationMessageProps, "name" | "id">>;
 }) {
   const [active, setActive] = useState("0");
   const { setValue, getValues } = useFormContext<FieldValues>();
@@ -443,6 +531,7 @@ function HookAnyOfTabs({
             jsonProperty={opt}
             required={required}
             inputId={parentName}
+            validationMessageProps={validationMessageProps}
           />
         </TabsContent>
       ))}

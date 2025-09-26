@@ -5,21 +5,27 @@ import { Button } from "../ui/button";
 import { HookAutoField } from "./hook-auto-field";
 import { replaceRefs } from "../../lib/autoform/refs";
 import type { JsonSchema } from "./types";
+import type { ValidationMessageProps } from "../ui/validation-message";
 
 export type HookAutoFormProps = {
   schema: JsonSchema;
   defaultValues?: FieldValues;
   onSubmit?: (values: FieldValues) => void;
+  validationMessageProps?: Partial<Omit<ValidationMessageProps, "name" | "id">>;
 };
 
 export const HookAutoForm = ({
   schema,
   defaultValues,
   onSubmit,
+  validationMessageProps,
 }: HookAutoFormProps) => {
   const resolvedSchema = replaceRefs(schema);
   const form = useForm<FieldValues>({
     defaultValues,
+    mode: "onChange",
+    reValidateMode: "onChange",
+    criteriaMode: "all",
   });
   const [lastSubmittedValues, setLastSubmittedValues] =
     useState<FieldValues | null>(null);
@@ -50,6 +56,7 @@ export const HookAutoForm = ({
                   name={key}
                   jsonProperty={value}
                   required={requiredFields.has(key)}
+                  validationMessageProps={validationMessageProps}
                 />
               </li>
             )

@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -284,5 +284,95 @@ describe("HookAutoForm", () => {
     expect(handleSubmit).toHaveBeenLastCalledWith({
       person: { contact: "bob@example.com" },
     });
+  });
+
+  it("shows validation messages for required fields and clears once corrected", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <HookAutoForm
+        schema={{
+          type: "object",
+          properties: {
+            name: { type: "string" },
+          },
+          required: ["name"],
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(await screen.findByText("This field is required.")).toBeVisible();
+
+    const input = screen.getByLabelText(/name/i);
+    expect(input).toHaveAttribute("aria-invalid", "true");
+
+    await user.type(input, "Ada");
+
+    await waitFor(() => {
+      expect(
+        screen.queryByText("This field is required.")
+      ).not.toBeInTheDocument();
+    });
+
+    expect(input).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("renders validation messages for multiple invalid fields simultaneously", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <HookAutoForm
+        schema={{
+          type: "object",
+          properties: {
+            name: { type: "string" },
+            email: { type: "string", format: "email" },
+          },
+          required: ["name", "email"],
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    const messages = await screen.findAllByText("This field is required.");
+    expect(messages).toHaveLength(2);
+
+    expect(screen.getByLabelText(/name/i)).toHaveAttribute(
+      "aria-invalid",
+      "true"
+    );
+    expect(screen.getByLabelText(/email/i)).toHaveAttribute(
+      "aria-invalid",
+      "true"
+    );
+  });
+
+  it("applies custom validation message options when provided", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <HookAutoForm
+        schema={{
+          type: "object",
+          properties: {
+            username: { type: "string" },
+          },
+          required: ["username"],
+        }}
+        validationMessageProps={{
+          className: "text-indigo-500",
+          icon: <span data-testid="custom-validation-icon">!</span>,
+        }}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveClass("text-indigo-500");
+    expect(screen.getAllByTestId("custom-validation-icon")).toHaveLength(1);
   });
 });
