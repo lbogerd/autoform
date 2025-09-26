@@ -94,7 +94,7 @@ const StrictObject = z.strictObject({
 }); // always sets additionalProperties: false
 
 /** Recursive type to exercise $ref and cycles */
-const Category: z.ZodType<any> = z.object({
+const Category: z.ZodObject = z.object({
   id: UUID,
   name: Name,
   children: z.array(z.lazy(() => Category)).default([]),

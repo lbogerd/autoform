@@ -17,7 +17,7 @@ describe("AutoField", () => {
   it("renders a fallback message when the provided schema is not an object", () => {
     // The component guards against malformed schemas by checking the runtime
     // shape. Passing a primitive should exercise that branch.
-    render(<AutoField jsonProperty={"not-a-schema" as any} />);
+    render(<AutoField jsonProperty={"not-a-schema"} />);
 
     expect(
       screen.getByText(/Invalid property schema: "not-a-schema"/i)
@@ -30,11 +30,8 @@ describe("AutoField", () => {
     render(
       <AutoField
         jsonProperty={{
-          anyOf: [
-            { type: "string" },
-            { type: "number" },
-          ],
-        } as any}
+          anyOf: [{ type: "string" }, { type: "number" }],
+        }}
       />
     );
 

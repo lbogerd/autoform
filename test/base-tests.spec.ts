@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { asJsonSchema, KitchenSink } from "./kitchen-sink-schema";
-import { replaceRefs } from "../src/components/autoform/auto-form";
+import { replaceRefs } from "../src/lib/autoform/refs";
 import z from "zod";
 
 describe("Base tests", () => {

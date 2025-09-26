@@ -3,7 +3,7 @@ import { FormProvider, useForm, type FieldValues } from "react-hook-form";
 
 import { Button } from "../ui/button";
 import { HookAutoField } from "./hook-auto-field";
-import { replaceRefs } from "./auto-form";
+import { replaceRefs } from "../../lib/autoform/refs";
 import type { JsonSchema } from "./types";
 
 export type HookAutoFormProps = {
@@ -21,9 +21,8 @@ export const HookAutoForm = ({
   const form = useForm<FieldValues>({
     defaultValues,
   });
-  const [lastSubmittedValues, setLastSubmittedValues] = useState<FieldValues | null>(
-    null,
-  );
+  const [lastSubmittedValues, setLastSubmittedValues] =
+    useState<FieldValues | null>(null);
 
   const handleSubmit = form.handleSubmit((values) => {
     setLastSubmittedValues(values);
@@ -52,7 +51,7 @@ export const HookAutoForm = ({
                   required={requiredFields.has(key)}
                 />
               </li>
-            ),
+            )
           )}
         </ul>
 

@@ -45,23 +45,28 @@ export const AutoField = ({
   }
 
   switch (type) {
-    case "array":
-      // TODO: make it a single field for now, add support for multiple items later
+    case "array": {
       // jsonSchema items can be: true | _JSONSchema | _JSONSchema[]
-      const items = (jsonProperty as any).items;
+      // TODO: make it a single field for now, add support for multiple items later
+      const items = jsonProperty.items;
+
       if (!items) {
         return <></>;
       }
+
       // Tuple-style items (array) - pick the first item for now
       if (Array.isArray(items)) {
         return <AutoField jsonProperty={items[0] as JsonProperty} />;
       }
+
       // items === true means any type allowed; render a generic input
       if (items === true) {
         return <Input type="text" />;
       }
+
       // single schema
       return <AutoField jsonProperty={items as JsonProperty} />;
+    }
 
     case "object":
       // If explicit properties exist, render them
