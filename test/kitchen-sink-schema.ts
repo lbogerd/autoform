@@ -1,3 +1,4 @@
+import type { JsonSchema } from "@/components/autoform/types";
 import * as z from "zod";
 
 /** Reused primitives (to test `reused: "ref"` extraction) */
@@ -801,4 +802,4 @@ export const asJsonSchema = {
       additionalProperties: false,
     },
   },
-};
+} as JsonSchema;

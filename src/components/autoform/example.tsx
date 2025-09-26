@@ -1,10 +1,9 @@
 import { asJsonSchema } from "../../../test/kitchen-sink-schema";
 import { AutoForm } from "./auto-form";
 import { HookAutoForm } from "./hook-auto-form";
-import type { JsonSchema } from "./types";
 
 export const Example = () => {
-  const input = asJsonSchema as JsonSchema;
+  const input = asJsonSchema;
 
   return (
     <div className="grid gap-10 md:grid-cols-2">
@@ -13,7 +12,9 @@ export const Example = () => {
         <AutoForm schema={input} />
       </section>
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">HookAutoForm (react-hook-form)</h2>
+        <h2 className="text-lg font-semibold">
+          HookAutoForm (react-hook-form)
+        </h2>
         <HookAutoForm schema={input} />
       </section>
     </div>
