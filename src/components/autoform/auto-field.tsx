@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Input } from "../ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "../ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import type { JsonProperty, StringProperty } from "./types";
 import type { _JSONSchema } from "node_modules/zod/v4/core/json-schema.d.cts";
 
@@ -15,10 +16,7 @@ export const AutoField = ({
   }
 
   if ("anyOf" in jsonProperty && jsonProperty.anyOf) {
-    // for simplicity, just take the first anyOf option
-    // TODO: make this handle multiple options by generating tabs
-    // for each option
-    return <AutoField jsonProperty={jsonProperty.anyOf[0]} />;
+    return <AnyOfTabs options={jsonProperty.anyOf} />;
   }
 
   if (!("type" in jsonProperty))
@@ -166,3 +164,48 @@ export const AutoField = ({
       );
   }
 };
+
+function AnyOfTabs({
+  options,
+}: {
+  options: Array<JsonProperty | _JSONSchema>;
+}) {
+  const [active, setActive] = useState("0");
+
+  const getLabel = (opt: unknown, idx: number): string => {
+    if (
+      opt &&
+      typeof opt === "object" &&
+      "title" in (opt as Record<string, unknown>)
+    ) {
+      const t = (opt as { title?: unknown }).title;
+      if (typeof t === "string" && t.trim().length > 0) return t;
+    }
+    if (
+      opt &&
+      typeof opt === "object" &&
+      "type" in (opt as Record<string, unknown>)
+    ) {
+      const tp = (opt as { type?: unknown }).type;
+      if (typeof tp === "string" && tp) return tp;
+    }
+    return `Option ${idx + 1}`;
+  };
+
+  return (
+    <Tabs value={active} onValueChange={setActive}>
+      <TabsList>
+        {options.map((opt, i) => (
+          <TabsTrigger key={i} value={String(i)}>
+            {getLabel(opt, i)}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+      {options.map((opt, i) => (
+        <TabsContent key={i} value={String(i)}>
+          <AutoField jsonProperty={opt} />
+        </TabsContent>
+      ))}
+    </Tabs>
+  );
+}

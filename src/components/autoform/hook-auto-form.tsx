@@ -25,8 +25,9 @@ export const HookAutoForm = ({
     useState<FieldValues | null>(null);
 
   const handleSubmit = form.handleSubmit((values) => {
-    setLastSubmittedValues(values);
-    onSubmit?.(values);
+  const normalized = normalizeAnyOfValues(values) as FieldValues;
+  setLastSubmittedValues(normalized);
+  onSubmit?.(normalized);
   });
 
   const currentValues = form.watch();
@@ -82,3 +83,35 @@ export const HookAutoForm = ({
     </FormProvider>
   );
 };
+
+function normalizeAnyOfValues(values: unknown): unknown {
+  if (values == null || typeof values !== "object") return values;
+
+  if (Array.isArray(values)) {
+    return values.map((v) => normalizeAnyOfValues(v));
+  }
+
+  const obj = values as Record<string, unknown>;
+
+  // Handle leaf anyOf container pattern: { __anyOf: [...], __anyOfIndex: "i" }
+  if ("__anyOf" in obj && Array.isArray(obj.__anyOf)) {
+    const idxRaw = obj.__anyOfIndex;
+    const idx = typeof idxRaw === "string" ? parseInt(idxRaw, 10) : Number(idxRaw ?? 0);
+    const chosen = obj.__anyOf[idx] ?? obj.__anyOf[0];
+    return normalizeAnyOfValues(chosen);
+  }
+
+  // Recurse into children, and collapse nested anyOf values
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (k === "__anyOf" || k === "__anyOfIndex") continue;
+
+    // If child is an anyOf container rendered via HookAnyOfTabs, we expect
+    // a structure like v = { __anyOf: [...], __anyOfIndex: ... } or an object containing it.
+    out[k] = normalizeAnyOfValues(v);
+  }
+
+  // Special case: if this object contains only an __anyOf subobject under some key
+  // handled by recursion above, the child recursion will have collapsed it already.
+  return out;
+}

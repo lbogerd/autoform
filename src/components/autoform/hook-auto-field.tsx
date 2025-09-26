@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Controller,
   useFieldArray,
@@ -18,9 +18,10 @@ import {
 } from "../ui/select";
 import type { JsonProperty } from "./types";
 import type { _JSONSchema } from "node_modules/zod/v4/core/json-schema.d.cts";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
 const resolveSchema = (
-  schema: JsonProperty | _JSONSchema,
+  schema: JsonProperty | _JSONSchema
 ): JsonProperty | _JSONSchema => {
   if (
     typeof schema === "object" &&
@@ -36,7 +37,7 @@ const resolveSchema = (
 };
 
 const getDefaultValueForSchema = (
-  schema: JsonProperty | _JSONSchema,
+  schema: JsonProperty | _JSONSchema
 ): unknown => {
   if (typeof schema !== "object" || schema === null) {
     return null;
@@ -81,7 +82,7 @@ const HookArrayField = ({
 }) => {
   const resolvedItemSchema = useMemo(
     () => resolveSchema(itemSchema),
-    [itemSchema],
+    [itemSchema]
   );
 
   const { control, getValues, setValue } = useFormContext<FieldValues>();
@@ -109,11 +110,7 @@ const HookArrayField = ({
                 jsonProperty={resolvedItemSchema}
               />
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => remove(index)}
-            >
+            <Button type="button" variant="ghost" onClick={() => remove(index)}>
               Remove
             </Button>
           </li>
@@ -134,13 +131,33 @@ export const HookAutoField = ({
   name,
   jsonProperty,
   required,
+  inputId,
 }: {
   name: string;
   jsonProperty: JsonProperty | _JSONSchema;
   required?: boolean;
+  inputId?: string;
 }) => {
-  const schema = resolveSchema(jsonProperty);
   const { control, register } = useFormContext<FieldValues>();
+
+  // Handle anyOf BEFORE resolving the schema to first option
+  if (
+    typeof jsonProperty === "object" &&
+    jsonProperty !== null &&
+    "anyOf" in jsonProperty &&
+    Array.isArray(jsonProperty.anyOf) &&
+    jsonProperty.anyOf.length > 0
+  ) {
+    return (
+      <HookAnyOfTabs
+        parentName={name}
+        options={jsonProperty.anyOf}
+        required={required}
+      />
+    );
+  }
+
+  const schema = resolveSchema(jsonProperty);
 
   if (typeof schema !== "object" || schema === null) {
     return <span>Invalid property schema: {JSON.stringify(schema)}</span>;
@@ -150,7 +167,13 @@ export const HookAutoField = ({
     return <span>No type found: {JSON.stringify(schema)}</span>;
   }
 
-  if ("enum" in schema && Array.isArray(schema.enum) && schema.enum.length > 0) {
+  // anyOf handled above
+
+  if (
+    "enum" in schema &&
+    Array.isArray(schema.enum) &&
+    schema.enum.length > 0
+  ) {
     const options = schema.enum.map((option) => ({
       key: String(option),
       value: option,
@@ -162,7 +185,7 @@ export const HookAutoField = ({
         name={name}
         render={({ field }) => {
           const selected = options.find((option) =>
-            Object.is(option.value, field.value),
+            Object.is(option.value, field.value)
           );
 
           return (
@@ -194,9 +217,11 @@ export const HookAutoField = ({
 
   switch (type) {
     case "array": {
-      const items = (schema as {
-        items?: JsonProperty | JsonProperty[] | true;
-      }).items;
+      const items = (
+        schema as {
+          items?: JsonProperty | JsonProperty[] | true;
+        }
+      ).items;
 
       if (!items) {
         return <span className="text-muted-foreground">[]</span>;
@@ -214,13 +239,15 @@ export const HookAutoField = ({
     }
 
     case "object": {
-      const properties = (schema as {
-        properties?: Record<string, JsonProperty | _JSONSchema>;
-        required?: string[];
-        additionalProperties?: unknown;
-      }).properties;
+      const properties = (
+        schema as {
+          properties?: Record<string, JsonProperty | _JSONSchema>;
+          required?: string[];
+          additionalProperties?: unknown;
+        }
+      ).properties;
       const requiredKeys = new Set(
-        (schema as { required?: string[] }).required ?? [],
+        (schema as { required?: string[] }).required ?? []
       );
 
       if (properties && Object.keys(properties).length > 0) {
@@ -260,16 +287,15 @@ export const HookAutoField = ({
     }
 
     case "string": {
-      const format =
-        Object.prototype.hasOwnProperty.call(schema, "format")
-          ? (schema as { format?: string }).format
-          : undefined;
+      const format = Object.prototype.hasOwnProperty.call(schema, "format")
+        ? (schema as { format?: string }).format
+        : undefined;
 
       switch (format) {
         case "email":
           return (
             <Input
-              id={name}
+              id={inputId ?? name}
               type="email"
               aria-required={required}
               {...register(name)}
@@ -278,7 +304,7 @@ export const HookAutoField = ({
         case "uri":
           return (
             <Input
-              id={name}
+              id={inputId ?? name}
               type="url"
               aria-required={required}
               {...register(name)}
@@ -287,7 +313,7 @@ export const HookAutoField = ({
         case "date-time":
           return (
             <Input
-              id={name}
+              id={inputId ?? name}
               type="datetime-local"
               aria-required={required}
               {...register(name)}
@@ -296,7 +322,7 @@ export const HookAutoField = ({
         case "date":
           return (
             <Input
-              id={name}
+              id={inputId ?? name}
               type="date"
               aria-required={required}
               {...register(name)}
@@ -305,7 +331,7 @@ export const HookAutoField = ({
         case "time":
           return (
             <Input
-              id={name}
+              id={inputId ?? name}
               type="time"
               step={1}
               aria-required={required}
@@ -315,7 +341,7 @@ export const HookAutoField = ({
         default:
           return (
             <Input
-              id={name}
+              id={inputId ?? name}
               type="text"
               aria-required={required}
               {...register(name)}
@@ -328,7 +354,7 @@ export const HookAutoField = ({
     case "integer":
       return (
         <Input
-          id={name}
+          id={inputId ?? name}
           type="number"
           aria-required={required}
           {...register(name, { valueAsNumber: true })}
@@ -342,7 +368,7 @@ export const HookAutoField = ({
           name={name}
           render={({ field }) => (
             <Checkbox
-              id={name}
+              id={inputId ?? name}
               checked={Boolean(field.value)}
               aria-required={required}
               onCheckedChange={(checked) => field.onChange(Boolean(checked))}
@@ -355,8 +381,71 @@ export const HookAutoField = ({
       return <span className="font-mono">null</span>;
 
     default:
-      return (
-        <span>Unsupported field type: {JSON.stringify(schema)}</span>
-      );
+      return <span>Unsupported field type: {JSON.stringify(schema)}</span>;
   }
 };
+
+function HookAnyOfTabs({
+  parentName,
+  options,
+  required,
+}: {
+  parentName: string;
+  options: Array<JsonProperty | _JSONSchema>;
+  required?: boolean;
+}) {
+  const [active, setActive] = useState("0");
+  const { setValue, getValues } = useFormContext<FieldValues>();
+
+  // Initialize and sync the active index into form state so submit can normalize values
+  useEffect(() => {
+    const indexPath = `${parentName}.__anyOfIndex`;
+    const existing = getValues(indexPath);
+    const initial = existing != null ? String(existing) : "0";
+    setActive(initial);
+    setValue(indexPath, initial, { shouldDirty: false, shouldTouch: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parentName]);
+
+  const handleChange = (val: string) => {
+    setActive(val);
+    setValue(`${parentName}.__anyOfIndex`, val, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+  };
+
+  const getLabel = (opt: unknown, idx: number): string => {
+    if (opt && typeof opt === "object") {
+      const t = (opt as { title?: unknown }).title;
+      if (typeof t === "string" && t.trim()) return t;
+      const tp = (opt as { type?: unknown }).type;
+      if (typeof tp === "string" && tp) return tp;
+    }
+    return `Option ${idx + 1}`;
+  };
+
+  return (
+    <Tabs value={active} onValueChange={handleChange}>
+      <TabsList>
+        {options.map((opt, i) => (
+          <TabsTrigger key={i} value={String(i)}>
+            {getLabel(opt, i)}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+      {options.map((opt, i) => (
+        <TabsContent key={i} value={String(i)}>
+          {/* Keep id stable for the parent label, but scope RHF field names per option
+              so switching doesn't clobber incompatible values. */}
+          <HookAutoField
+            name={`${parentName}.__anyOf.${i}`}
+            jsonProperty={opt}
+            required={required}
+            inputId={parentName}
+          />
+        </TabsContent>
+      ))}
+    </Tabs>
+  );
+}

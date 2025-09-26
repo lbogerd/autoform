@@ -114,4 +114,48 @@ describe("AutoField", () => {
       "^[a-z]+$"
     );
   });
+
+  it("renders tabs for anyOf and switches content when selecting a tab", async () => {
+    const user = await (
+      await import("@testing-library/user-event")
+    ).default.setup();
+
+    render(
+      <AutoField
+        jsonProperty={{
+          anyOf: [
+            { type: "string", title: "Text" },
+            { type: "number", title: "Number" },
+          ],
+        }}
+      />
+    );
+
+    // Tabs are rendered with proper roles
+    expect(screen.getByRole("tablist")).toBeInTheDocument();
+    const textTab = screen.getByRole("tab", { name: /text/i });
+    const numberTab = screen.getByRole("tab", { name: /number/i });
+
+    // First option is active by default
+    expect(textTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("textbox")).toHaveAttribute("type", "text");
+
+    // Switch to Number and assert input changes
+    await user.click(numberTab);
+    expect(numberTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("spinbutton")).toBeInTheDocument();
+  });
+
+  it("uses default labels when anyOf options have no title (falls back to type)", () => {
+    render(
+      <AutoField
+        jsonProperty={{
+          anyOf: [{ type: "string" }, { type: "number" }],
+        }}
+      />
+    );
+
+    expect(screen.getByRole("tab", { name: /string/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /number/i })).toBeInTheDocument();
+  });
 });

@@ -13,7 +13,6 @@ beforeAll(() => {
   }
 
   if (typeof globalThis.ResizeObserver === "undefined") {
-    // @ts-expect-error - jsdom does not provide ResizeObserver in the test environment
     globalThis.ResizeObserver = MockResizeObserver;
   }
 });
@@ -150,5 +149,140 @@ describe("HookAutoForm", () => {
     expect(screen.getByDisplayValue("existing")).toBeInTheDocument();
     expect(screen.queryByDisplayValue("override")).not.toBeInTheDocument();
     expect(screen.queryByDisplayValue("another")).not.toBeInTheDocument();
+  });
+
+  it("renders anyOf options as tabs and switches active schema", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <HookAutoForm
+        schema={{
+          type: "object",
+          properties: {
+            choice: {
+              anyOf: [
+                { type: "string", title: "Text" },
+                { type: "boolean", title: "Flag" },
+              ],
+            },
+          },
+        }}
+      />
+    );
+
+    // Tabs and default selection
+    const tablist = screen.getByRole("tablist");
+    expect(tablist).toBeInTheDocument();
+    const textTab = screen.getByRole("tab", { name: /text/i });
+    const flagTab = screen.getByRole("tab", { name: /flag/i });
+    expect(textTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("textbox")).toBeInTheDocument();
+
+    // Switch to boolean
+    await user.click(flagTab);
+    expect(flagTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("checkbox")).toBeInTheDocument();
+  });
+
+  it("preserves field state per anyOf option when switching tabs", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <HookAutoForm
+        schema={{
+          type: "object",
+          properties: {
+            value: {
+              anyOf: [
+                { type: "string", title: "Text" },
+                { type: "number", title: "Number" },
+              ],
+            },
+          },
+        }}
+      />
+    );
+
+    await user.type(screen.getByLabelText(/value/i), "hello");
+    await user.click(screen.getByRole("tab", { name: /number/i }));
+    await user.type(screen.getByLabelText(/value/i), "42");
+    await user.click(screen.getByRole("tab", { name: /text/i }));
+
+    // Text value should remain
+    expect(screen.getByLabelText(/value/i)).toHaveValue("hello");
+  });
+
+  it("submits only the active anyOf option value for a top-level field", async () => {
+    const user = userEvent.setup();
+    const handleSubmit = vi.fn();
+
+    render(
+      <HookAutoForm
+        onSubmit={handleSubmit}
+        schema={{
+          type: "object",
+          properties: {
+            choice: {
+              anyOf: [
+                { type: "string", title: "Text" },
+                { type: "boolean", title: "Flag" },
+              ],
+            },
+          },
+          required: ["choice"],
+        }}
+      />
+    );
+
+    // Enter text, then switch to boolean and check it, then submit
+    await user.type(screen.getByLabelText(/choice/i), "hello");
+    await user.click(screen.getByRole("tab", { name: /flag/i }));
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(handleSubmit).toHaveBeenCalledTimes(1);
+    expect(handleSubmit).toHaveBeenLastCalledWith({ choice: true });
+  });
+
+  it("normalizes nested anyOf within an object to match schema shape", async () => {
+    const user = userEvent.setup();
+    const handleSubmit = vi.fn();
+
+    render(
+      <HookAutoForm
+        onSubmit={handleSubmit}
+        schema={{
+          type: "object",
+          properties: {
+            person: {
+              type: "object",
+              properties: {
+                contact: {
+                  anyOf: [
+                    { type: "string", title: "Email", format: "email" },
+                    { type: "number", title: "ID" },
+                  ],
+                },
+              },
+              required: ["contact"],
+            },
+          },
+          required: ["person"],
+        }}
+      />
+    );
+
+    // Default is Email tab; enter email, switch to ID and type a number, then back to Email
+    await user.type(screen.getByLabelText(/contact/i), "bob@example.com");
+    await user.click(screen.getByRole("tab", { name: /id/i }));
+    await user.type(screen.getByLabelText(/contact/i), "42");
+    await user.click(screen.getByRole("tab", { name: /email/i }));
+
+    await user.click(screen.getByRole("button", { name: "Submit" }));
+
+    expect(handleSubmit).toHaveBeenCalledTimes(1);
+    expect(handleSubmit).toHaveBeenLastCalledWith({
+      person: { contact: "bob@example.com" },
+    });
   });
 });
