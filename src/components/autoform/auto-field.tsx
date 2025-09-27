@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Controller,
   useFieldArray,
   useFormContext,
   useFormState,
+  useWatch,
   type FieldPath,
   type FieldValues,
 } from "react-hook-form";
 
+import type { _JSONSchema } from "node_modules/zod/v4/core/json-schema.d.cts";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Input } from "../ui/input";
@@ -19,16 +21,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import {
   ValidationMessage,
   type ValidationMessageProps,
 } from "../ui/validation-message";
 import type { JsonProperty } from "./types";
-import type { _JSONSchema } from "node_modules/zod/v4/core/json-schema.d.cts";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
 const resolveSchema = (
-  schema: JsonProperty | _JSONSchema,
+  schema: JsonProperty | _JSONSchema
 ): JsonProperty | _JSONSchema => {
   if (
     typeof schema === "object" &&
@@ -44,7 +45,7 @@ const resolveSchema = (
 };
 
 const getDefaultValueForSchema = (
-  schema: JsonProperty | _JSONSchema,
+  schema: JsonProperty | _JSONSchema
 ): unknown => {
   if (typeof schema !== "object" || schema === null) {
     return null;
@@ -91,7 +92,7 @@ const ArrayField = ({
 }) => {
   const resolvedItemSchema = useMemo(
     () => resolveSchema(itemSchema),
-    [itemSchema],
+    [itemSchema]
   );
 
   const { control, getValues, setValue } = useFormContext<FieldValues>();
@@ -224,7 +225,7 @@ export const AutoField = ({
         rules={validationRules}
         render={({ field }) => {
           const selected = options.find((option) =>
-            Object.is(option.value, field.value),
+            Object.is(option.value, field.value)
           );
 
           return (
@@ -252,7 +253,7 @@ export const AutoField = ({
             </Select>
           );
         }}
-      />,
+      />
     );
   }
 
@@ -268,7 +269,7 @@ export const AutoField = ({
 
       if (!items) {
         return appendValidationMessage(
-          <span className="text-muted-foreground">[]</span>,
+          <span className="text-muted-foreground">[]</span>
         );
       }
 
@@ -278,7 +279,7 @@ export const AutoField = ({
             name={name}
             itemSchema={items[0] ?? {}}
             validationMessageProps={validationMessageProps}
-          />,
+          />
         );
       }
 
@@ -288,7 +289,7 @@ export const AutoField = ({
             name={name}
             itemSchema={{ type: "string" }}
             validationMessageProps={validationMessageProps}
-          />,
+          />
         );
       }
 
@@ -297,58 +298,68 @@ export const AutoField = ({
           name={name}
           itemSchema={items}
           validationMessageProps={validationMessageProps}
-        />,
+        />
       );
     }
 
     case "object": {
-      const properties = (
-        schema as {
-          properties?: Record<string, JsonProperty | _JSONSchema>;
-          required?: string[];
-          additionalProperties?: unknown;
-        }
-      ).properties;
-      const requiredKeys = new Set(
-        (schema as { required?: string[] }).required ?? [],
-      );
+      const objectSchema = schema as {
+        properties?: Record<string, JsonProperty | _JSONSchema>;
+        required?: string[];
+        additionalProperties?: JsonProperty | _JSONSchema | boolean;
+      };
+      const propertyEntries = Object.entries(objectSchema.properties ?? {});
+      const propertyKeys = propertyEntries.map(([key]) => key);
+      const hasStaticProps = propertyEntries.length > 0;
+      const requiredKeys = new Set(objectSchema.required ?? []);
+      const additionalSchema =
+        objectSchema.additionalProperties === undefined ||
+        objectSchema.additionalProperties === false
+          ? undefined
+          : objectSchema.additionalProperties === true
+          ? { type: "string" }
+          : objectSchema.additionalProperties;
 
-      if (properties && Object.keys(properties).length > 0) {
+      if (!hasStaticProps && !additionalSchema) {
         return appendValidationMessage(
-          <ul className="space-y-3 rounded-md border p-4">
-            {Object.entries(properties).map(([key, value]) => (
-              <li key={key} className="space-y-2">
-                <label
-                  htmlFor={`${name}.${key}`}
-                  className="text-sm font-medium"
-                >
-                  {key}
-                  {requiredKeys.has(key) ? (
-                    <span className="text-destructive ml-1">*</span>
-                  ) : null}
-                </label>
-                <AutoField
-                  name={`${name}.${key}`}
-                  jsonProperty={value}
-                  required={requiredKeys.has(key)}
-                  validationMessageProps={validationMessageProps}
-                />
-              </li>
-            ))}
-          </ul>,
-        );
-      }
-
-      if ("additionalProperties" in schema) {
-        return appendValidationMessage(
-          <span className="text-muted-foreground">
-            Record-style objects are not yet supported in AutoForm.
-          </span>,
+          <span className="text-muted-foreground">{`{ }`}</span>
         );
       }
 
       return appendValidationMessage(
-        <span className="text-muted-foreground">{`{ }`}</span>,
+        <div className="space-y-3 rounded-md border p-4">
+          {hasStaticProps ? (
+            <ul className="space-y-3">
+              {propertyEntries.map(([key, value]) => (
+                <li key={key} className="space-y-2">
+                  <label
+                    htmlFor={`${name}.${key}`}
+                    className="text-sm font-medium"
+                  >
+                    {key}
+                    {requiredKeys.has(key) ? (
+                      <span className="text-destructive ml-1">*</span>
+                    ) : null}
+                  </label>
+                  <AutoField
+                    name={`${name}.${key}`}
+                    jsonProperty={value}
+                    required={requiredKeys.has(key)}
+                    validationMessageProps={validationMessageProps}
+                  />
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {additionalSchema ? (
+            <AdditionalPropertiesField
+              parentName={name}
+              schema={additionalSchema as JsonProperty | _JSONSchema}
+              reservedKeys={propertyKeys}
+              validationMessageProps={validationMessageProps}
+            />
+          ) : null}
+        </div>
       );
     }
 
@@ -367,7 +378,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />,
+            />
           );
         case "uri":
           return appendValidationMessage(
@@ -378,7 +389,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />,
+            />
           );
         case "date-time":
           return appendValidationMessage(
@@ -389,7 +400,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />,
+            />
           );
         case "date":
           return appendValidationMessage(
@@ -400,7 +411,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />,
+            />
           );
         case "time":
           return appendValidationMessage(
@@ -412,7 +423,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />,
+            />
           );
         default:
           return appendValidationMessage(
@@ -423,7 +434,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />,
+            />
           );
       }
     }
@@ -441,7 +452,7 @@ export const AutoField = ({
             valueAsNumber: true,
             ...(validationRules ?? {}),
           })}
-        />,
+        />
       );
 
     case "boolean":
@@ -460,7 +471,7 @@ export const AutoField = ({
               onCheckedChange={(checked) => field.onChange(Boolean(checked))}
             />
           )}
-        />,
+        />
       );
 
     case "null":
@@ -536,5 +547,133 @@ function AnyOfTabs({
         </TabsContent>
       ))}
     </Tabs>
+  );
+}
+
+function AdditionalPropertiesField({
+  parentName,
+  schema,
+  reservedKeys,
+  validationMessageProps,
+}: {
+  parentName: string;
+  schema: JsonProperty | _JSONSchema;
+  reservedKeys: string[];
+  validationMessageProps?: Partial<Omit<ValidationMessageProps, "name" | "id">>;
+}) {
+  const [newKey, setNewKey] = useState("");
+  const resolvedSchema = useMemo(() => resolveSchema(schema), [schema]);
+  const { getValues, setValue } = useFormContext<FieldValues>();
+  const watchedValue = useWatch({ name: parentName });
+  const addInputId = useMemo(
+    () => `${parentName}.__newKey`.replace(/[^a-zA-Z0-9_-]+/g, "-"),
+    [parentName]
+  );
+
+  useEffect(() => {
+    if (
+      watchedValue == null ||
+      typeof watchedValue !== "object" ||
+      Array.isArray(watchedValue)
+    ) {
+      setValue(parentName, {}, { shouldDirty: false, shouldTouch: false });
+    }
+  }, [parentName, setValue, watchedValue]);
+
+  const reservedSet = useMemo(() => new Set(reservedKeys), [reservedKeys]);
+
+  const dynamicKeys = useMemo(() => {
+    if (!watchedValue || typeof watchedValue !== "object") return [];
+    return Object.keys(watchedValue as Record<string, unknown>).filter(
+      (key) => !reservedSet.has(key) && !key.startsWith("__")
+    );
+  }, [reservedSet, watchedValue]);
+
+  const existingKeySet = useMemo(() => {
+    const set = new Set(reservedKeys);
+    for (const key of dynamicKeys) set.add(key);
+    return set;
+  }, [reservedKeys, dynamicKeys]);
+
+  const trimmedKey = newKey.trim();
+  const keyInvalid =
+    trimmedKey.length === 0 ||
+    /[.[\]]/.test(trimmedKey) ||
+    trimmedKey.startsWith("__") ||
+    existingKeySet.has(trimmedKey);
+
+  const handleAdd = () => {
+    if (keyInvalid) return;
+    const current =
+      (getValues(parentName) as Record<string, unknown> | undefined) ?? {};
+    const next = {
+      ...current,
+      [trimmedKey]: getDefaultValueForSchema(resolvedSchema),
+    };
+    setValue(parentName, next, { shouldDirty: true, shouldTouch: false });
+    setNewKey("");
+  };
+
+  const handleRemove = (key: string) => {
+    const current =
+      (getValues(parentName) as Record<string, unknown> | undefined) ?? {};
+    if (!(key in current)) return;
+    const { [key]: _removed, ...rest } = current;
+    setValue(parentName, rest, { shouldDirty: true, shouldTouch: true });
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-end gap-2">
+        <div className="flex-1 space-y-1">
+          <label htmlFor={addInputId} className="text-sm font-medium">
+            Add property
+          </label>
+          <Input
+            id={addInputId}
+            value={newKey}
+            placeholder="Key name"
+            onChange={(event) => setNewKey(event.target.value)}
+          />
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleAdd}
+          disabled={keyInvalid}
+        >
+          Add
+        </Button>
+      </div>
+      {dynamicKeys.length > 0 ? (
+        <ul className="space-y-3">
+          {dynamicKeys.map((key) => (
+            <li key={key} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor={`${parentName}.${key}`}
+                  className="text-sm font-medium"
+                >
+                  {key}
+                </label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => handleRemove(key)}
+                >
+                  Remove
+                </Button>
+              </div>
+              <AutoField
+                name={`${parentName}.${key}`}
+                jsonProperty={schema}
+                inputId={`${parentName}.${key}`}
+                validationMessageProps={validationMessageProps}
+              />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
