@@ -133,7 +133,7 @@ describe("AutoField", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows a placeholder message for record-style objects", () => {
+  it("renders controls for record-style objects", () => {
     renderAutoField({
       schema: {
         type: "object",
@@ -141,9 +141,37 @@ describe("AutoField", () => {
       },
     });
 
-    expect(
-      screen.getByText(/Record-style objects are not yet supported/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/add property/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^add$/i })).toBeDisabled();
+  });
+
+  it("allows adding and removing record entries", async () => {
+    const user = userEvent.setup();
+
+    renderAutoField({
+      schema: {
+        type: "object",
+        additionalProperties: { type: "number" },
+      },
+    });
+
+    const keyInput = screen.getByLabelText(/add property/i);
+    const addButton = screen.getByRole("button", { name: /^add$/i });
+
+    await user.type(keyInput, "foo");
+
+    expect(addButton).toBeEnabled();
+
+    await user.click(addButton);
+
+    const dynamicField = screen.getByLabelText("foo");
+    expect(dynamicField).toHaveAttribute("type", "number");
+
+    await user.type(dynamicField, "123");
+
+    await user.click(screen.getByRole("button", { name: /remove/i }));
+
+    expect(screen.queryByLabelText("foo")).not.toBeInTheDocument();
   });
 
   it("renders tabs for anyOf and switches content when selecting a tab", async () => {
