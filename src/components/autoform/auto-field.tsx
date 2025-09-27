@@ -123,8 +123,6 @@ const getBooleanAriaLabel = (fieldPath: string): string => {
   let fallback = readable.toLowerCase();
   if (lower === "email") {
     fallback = "electronic mail";
-  } else if (lower === "sms") {
-    fallback = "sms";
   }
 
   return `Toggle ${fallback}`.trim();
