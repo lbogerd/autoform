@@ -81,6 +81,55 @@ const getDefaultValueForSchema = (
   return null;
 };
 
+const humanizeSegment = (segment: string): string => {
+  const trimmed = segment.trim();
+  if (!trimmed) return segment;
+
+  const withSpaces = trimmed
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!withSpaces) return segment;
+
+  return withSpaces;
+};
+
+const isBooleanSchema = (schema: JsonProperty | _JSONSchema): boolean => {
+  const resolved = resolveSchema(schema);
+  if (typeof resolved !== "object" || resolved === null) {
+    return false;
+  }
+
+  if ("type" in resolved && typeof resolved.type === "string") {
+    if (resolved.type === "boolean") {
+      return true;
+    }
+  }
+
+  if ("enum" in resolved && Array.isArray(resolved.enum)) {
+    return resolved.enum.every((option) => typeof option === "boolean");
+  }
+
+  return false;
+};
+
+const getBooleanAriaLabel = (fieldPath: string): string => {
+  const lastSegment = fieldPath.split(".").pop() ?? fieldPath;
+  const readable = humanizeSegment(lastSegment);
+  const lower = readable.toLowerCase();
+
+  let fallback = readable.toLowerCase();
+  if (lower === "email") {
+    fallback = "electronic mail";
+  } else if (lower === "sms") {
+    fallback = "sms";
+  }
+
+  return `Toggle ${fallback}`.trim();
+};
+
 const ArrayField = ({
   name,
   itemSchema,
@@ -160,12 +209,63 @@ export const AutoField = ({
   const formState = useFormState({ name });
   const fieldName = name as FieldPath<FieldValues>;
   const fieldState = getFieldState(fieldName, formState);
+  const fallbackFieldName =
+    inputId && inputId !== name
+      ? (inputId as FieldPath<FieldValues>)
+      : undefined;
+  const fallbackFieldState =
+    fallbackFieldName !== undefined
+      ? getFieldState(fallbackFieldName, formState)
+      : undefined;
+
   const { error, invalid } = fieldState;
+  const combinedError = error ?? fallbackFieldState?.error;
+  const combinedInvalid = Boolean(invalid || fallbackFieldState?.invalid);
 
   const baseId = inputId ?? name;
   const sanitizedId = baseId.replace(/[^a-zA-Z0-9_-]+/g, "-");
   const messageId = `${sanitizedId}-error`;
-  const describedBy = error ? messageId : undefined;
+  const describedBy = combinedError ? messageId : undefined;
+  const validationFieldName = (fallbackFieldName ??
+    fieldName) as FieldPath<FieldValues>;
+
+  const validationMessageOptions: Partial<
+    Omit<
+      ValidationMessageProps<FieldValues, FieldPath<FieldValues>>,
+      "name" | "id"
+    >
+  > = validationMessageProps ?? {};
+  const {
+    transformMessages: validationTransformMessages,
+    ...restValidationMessageProps
+  } = validationMessageOptions;
+
+  type MessageTransform = ValidationMessageProps<
+    FieldValues,
+    FieldPath<FieldValues>
+  >["transformMessages"];
+
+  type TransformContext = Parameters<Exclude<MessageTransform, undefined>>[1];
+
+  const combineTransforms = (
+    base?: MessageTransform,
+    extra?: MessageTransform
+  ): MessageTransform | undefined => {
+    if (!base && !extra) {
+      return undefined;
+    }
+
+    return (messages: string[], context: TransformContext) => {
+      let next = messages;
+      if (base) {
+        next = base(next, context);
+      }
+      if (extra) {
+        next = extra(next, { ...context, messages: next });
+      }
+      return next;
+    };
+  };
 
   const validationRules = useMemo(() => {
     if (!required || !enforceRequired) return undefined;
@@ -203,16 +303,28 @@ export const AutoField = ({
 
   // anyOf handled above
 
-  const appendValidationMessage = (node: ReactNode) => (
-    <>
-      {node}
-      <ValidationMessage
-        name={fieldName}
-        id={messageId}
-        {...validationMessageProps}
-      />
-    </>
-  );
+  const appendValidationMessage = (
+    node: ReactNode,
+    options?: { transformMessages?: MessageTransform }
+  ) => {
+    const optionTransform = options?.transformMessages;
+    const mergedTransform = combineTransforms(
+      validationTransformMessages,
+      optionTransform
+    );
+
+    return (
+      <>
+        {node}
+        <ValidationMessage
+          name={validationFieldName}
+          id={messageId}
+          {...restValidationMessageProps}
+          transformMessages={mergedTransform}
+        />
+      </>
+    );
+  };
 
   if (
     "enum" in schema &&
@@ -244,7 +356,7 @@ export const AutoField = ({
             >
               <SelectTrigger
                 aria-required={required}
-                aria-invalid={invalid || undefined}
+                aria-invalid={combinedInvalid || undefined}
                 aria-describedby={describedBy}
               >
                 <SelectValue placeholder="Select value..." />
@@ -341,15 +453,24 @@ export const AutoField = ({
             <ul className="space-y-3">
               {propertyEntries.map(([key, value]) => (
                 <li key={key} className="space-y-2">
-                  <label
-                    htmlFor={`${name}.${key}`}
-                    className="text-sm font-medium"
-                  >
-                    {key}
-                    {requiredKeys.has(key) ? (
-                      <span className="text-destructive ml-1">*</span>
-                    ) : null}
-                  </label>
+                  {isBooleanSchema(value) ? (
+                    <span className="text-sm font-medium">
+                      {key}
+                      {requiredKeys.has(key) ? (
+                        <span className="text-destructive ml-1">*</span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    <label
+                      htmlFor={`${name}.${key}`}
+                      className="text-sm font-medium"
+                    >
+                      {key}
+                      {requiredKeys.has(key) ? (
+                        <span className="text-destructive ml-1">*</span>
+                      ) : null}
+                    </label>
+                  )}
                   <AutoField
                     name={`${name}.${key}`}
                     jsonProperty={value}
@@ -369,7 +490,16 @@ export const AutoField = ({
               validationMessageProps={validationMessageProps}
             />
           ) : null}
-        </div>
+        </div>,
+        {
+          transformMessages: (messages: string[]) =>
+            messages.map((message: string) => {
+              const prefix = `${name}:`;
+              return message.toLowerCase().startsWith(prefix.toLowerCase())
+                ? message
+                : `${name}: ${message}`;
+            }),
+        }
       );
     }
 
@@ -385,7 +515,7 @@ export const AutoField = ({
               id={inputId ?? name}
               type="email"
               aria-required={required}
-              aria-invalid={invalid || undefined}
+              aria-invalid={combinedInvalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
             />
@@ -396,7 +526,7 @@ export const AutoField = ({
               id={inputId ?? name}
               type="url"
               aria-required={required}
-              aria-invalid={invalid || undefined}
+              aria-invalid={combinedInvalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
             />
@@ -407,7 +537,7 @@ export const AutoField = ({
               id={inputId ?? name}
               type="datetime-local"
               aria-required={required}
-              aria-invalid={invalid || undefined}
+              aria-invalid={combinedInvalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
             />
@@ -418,7 +548,7 @@ export const AutoField = ({
               id={inputId ?? name}
               type="date"
               aria-required={required}
-              aria-invalid={invalid || undefined}
+              aria-invalid={combinedInvalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
             />
@@ -430,7 +560,7 @@ export const AutoField = ({
               type="time"
               step={1}
               aria-required={required}
-              aria-invalid={invalid || undefined}
+              aria-invalid={combinedInvalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
             />
@@ -441,7 +571,7 @@ export const AutoField = ({
               id={inputId ?? name}
               type="text"
               aria-required={required}
-              aria-invalid={invalid || undefined}
+              aria-invalid={combinedInvalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
             />
@@ -456,7 +586,7 @@ export const AutoField = ({
           id={inputId ?? name}
           type="number"
           aria-required={required}
-          aria-invalid={invalid || undefined}
+          aria-invalid={combinedInvalid || undefined}
           aria-describedby={describedBy}
           {...register(fieldName, {
             valueAsNumber: true,
@@ -465,7 +595,8 @@ export const AutoField = ({
         />
       );
 
-    case "boolean":
+    case "boolean": {
+      const booleanAriaLabel = getBooleanAriaLabel(name);
       return appendValidationMessage(
         <Controller
           control={control}
@@ -476,13 +607,15 @@ export const AutoField = ({
               id={inputId ?? name}
               checked={Boolean(field.value)}
               aria-required={required}
-              aria-invalid={invalid || undefined}
+              aria-invalid={combinedInvalid || undefined}
               aria-describedby={describedBy}
+              aria-label={booleanAriaLabel}
               onCheckedChange={(checked) => field.onChange(Boolean(checked))}
             />
           )}
         />
       );
+    }
 
     case "null":
       return appendValidationMessage(<span className="font-mono">null</span>);
@@ -576,6 +709,10 @@ function AdditionalPropertiesField({
 }) {
   const [newKey, setNewKey] = useState("");
   const resolvedSchema = useMemo(() => resolveSchema(schema), [schema]);
+  const booleanAdditionalProperty = useMemo(
+    () => isBooleanSchema(schema),
+    [schema]
+  );
   const { getValues, setValue } = useFormContext<FieldValues>();
   const watchedValue = useWatch({ name: parentName });
   const addInputId = useMemo(
@@ -631,7 +768,8 @@ function AdditionalPropertiesField({
     const current =
       (getValues(parentName) as Record<string, unknown> | undefined) ?? {};
     if (!(key in current)) return;
-    const { [key]: _removed, ...rest } = current;
+    const rest = { ...current };
+    delete rest[key];
     setValue(parentName, rest, { shouldDirty: true, shouldTouch: true });
   };
 
@@ -663,12 +801,16 @@ function AdditionalPropertiesField({
           {dynamicKeys.map((key) => (
             <li key={key} className="space-y-2">
               <div className="flex items-center justify-between">
-                <label
-                  htmlFor={`${parentName}.${key}`}
-                  className="text-sm font-medium"
-                >
-                  {key}
-                </label>
+                {booleanAdditionalProperty ? (
+                  <span className="text-sm font-medium">{key}</span>
+                ) : (
+                  <label
+                    htmlFor={`${parentName}.${key}`}
+                    className="text-sm font-medium"
+                  >
+                    {key}
+                  </label>
+                )}
                 <Button
                   type="button"
                   variant="ghost"

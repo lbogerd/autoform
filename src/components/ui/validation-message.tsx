@@ -1,4 +1,5 @@
 import { AlertCircle } from "lucide-react";
+import { forwardRef, type ReactNode } from "react";
 import {
   useFormContext,
   useFormState,
@@ -7,13 +8,12 @@ import {
   type FieldPath,
   type FieldValues,
 } from "react-hook-form";
-import { forwardRef, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
 type RenderBaseContext<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
 > = {
   id: string;
   name: TName;
@@ -23,14 +23,14 @@ type RenderBaseContext<
 
 type RenderContext<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
 > = RenderBaseContext<TFieldValues, TName> & {
   icon: ReactNode | null;
 };
 
 type IconProp<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
 > =
   | null
   | false
@@ -39,12 +39,16 @@ type IconProp<
 
 export type ValidationMessageProps<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
 > = React.HTMLAttributes<HTMLDivElement> & {
   name: TName;
   id?: string;
   icon?: IconProp<TFieldValues, TName>;
   render?: (context: RenderContext<TFieldValues, TName>) => ReactNode;
+  transformMessages?: (
+    messages: string[],
+    context: RenderBaseContext<TFieldValues, TName>
+  ) => string[];
 };
 
 const sanitizeId = (value: string): string =>
@@ -115,7 +119,7 @@ const collectErrorMessages = (error: unknown): string[] => {
 export const ValidationMessage = forwardRef<
   HTMLDivElement,
   ValidationMessageProps
->(({ name, className, id, icon, render, ...rest }, ref) => {
+>(({ name, className, id, icon, render, transformMessages, ...rest }, ref) => {
   const { getFieldState } = useFormContext<FieldValues>();
   const formState = useFormState({ name });
   const fieldState = getFieldState(name, formState);
@@ -134,7 +138,7 @@ export const ValidationMessage = forwardRef<
         isDirty ||
         formState.isSubmitted ||
         formState.submitCount > 0 ||
-        isManualError),
+        isManualError)
   );
 
   if (!shouldDisplay) {
@@ -142,7 +146,7 @@ export const ValidationMessage = forwardRef<
   }
 
   const messages = collectErrorMessages(
-    error as FieldError | FieldErrorsImpl<FieldValues>,
+    error as FieldError | FieldErrorsImpl<FieldValues>
   );
 
   if (messages.length === 0) {
@@ -152,19 +156,32 @@ export const ValidationMessage = forwardRef<
   const fallbackId = sanitizeId(`${name}-validation-message`);
   const messageId = id ?? fallbackId;
 
-  const baseContext: RenderBaseContext = {
+  const baseContextBeforeTransform: RenderBaseContext = {
     id: messageId,
     name,
     messages,
     invalid: Boolean(invalid),
   };
 
+  const transformedMessages = transformMessages
+    ? transformMessages(messages, baseContextBeforeTransform)
+    : messages;
+
+  if (!transformedMessages || transformedMessages.length === 0) {
+    return null;
+  }
+
+  const baseContext: RenderBaseContext = {
+    ...baseContextBeforeTransform,
+    messages: transformedMessages,
+  };
+
   const resolvedIcon =
     icon === false || icon === null
       ? null
       : typeof icon === "function"
-        ? icon(baseContext)
-        : (icon ?? <AlertCircle className="size-4" aria-hidden="true" />);
+      ? icon(baseContext)
+      : icon ?? <AlertCircle className="size-4" aria-hidden="true" />;
 
   const renderContext: RenderContext = {
     ...baseContext,
@@ -185,7 +202,7 @@ export const ValidationMessage = forwardRef<
       data-slot="validation-message"
       className={cn(
         "mt-1 flex items-start gap-2 text-sm text-destructive",
-        className,
+        className
       )}
       {...rest}
     >
@@ -198,11 +215,11 @@ export const ValidationMessage = forwardRef<
           {resolvedIcon}
         </span>
       ) : null}
-      {messages.length === 1 ? (
-        <span data-slot="validation-text">{messages[0]}</span>
+      {transformedMessages.length === 1 ? (
+        <span data-slot="validation-text">{transformedMessages[0]}</span>
       ) : (
         <ul data-slot="validation-list" className="space-y-1">
-          {messages.map((message, index) => (
+          {transformedMessages.map((message, index) => (
             <li key={`${message}-${index}`} data-slot="validation-list-item">
               {message}
             </li>
