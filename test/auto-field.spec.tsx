@@ -68,7 +68,7 @@ describe("AutoField", () => {
     });
 
     expect(
-      screen.getByText(/Invalid property schema: "not-a-schema"/i),
+      screen.getByText(/Invalid property schema: "not-a-schema"/i)
     ).toBeInTheDocument();
   });
 
@@ -81,7 +81,7 @@ describe("AutoField", () => {
 
     expect(screen.getByRole("tab", { name: /string/i })).toHaveAttribute(
       "aria-selected",
-      "true",
+      "true"
     );
     expect(screen.getByRole("textbox")).toHaveAttribute("type", "text");
   });
@@ -129,7 +129,7 @@ describe("AutoField", () => {
     });
 
     expect(
-      screen.getByText(/title/i, { selector: "label" }),
+      screen.getByText(/title/i, { selector: "label" })
     ).toBeInTheDocument();
   });
 
