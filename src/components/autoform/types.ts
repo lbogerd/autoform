@@ -1,6 +1,6 @@
 import type { _JSONSchema } from "node_modules/zod/v4/core/json-schema.d.cts";
 import type { DeepPartial, FieldValues } from "react-hook-form";
-import type { ZodAny, input as ZodInput, output as ZodOutput } from "zod";
+import type { input as ZodInput, output as ZodOutput, ZodTypeAny } from "zod";
 
 // Shared base for all property variants
 export type BaseProperty = {
@@ -68,12 +68,12 @@ export type AutoFormJsonValidation = {
   schema: JsonSchema;
 };
 
-export type AutoFormZodValidation<TSchema extends ZodAny = ZodAny> = {
+export type AutoFormZodValidation<TSchema extends ZodTypeAny = ZodTypeAny> = {
   type: "zod";
   schema: TSchema;
 };
 
-export type AutoFormValidationSchema<TSchema extends ZodAny = ZodAny> =
+export type AutoFormValidationSchema<TSchema extends ZodTypeAny = ZodTypeAny> =
   | AutoFormJsonValidation
   | AutoFormZodValidation<TSchema>;
 
@@ -83,13 +83,13 @@ type ZodSchemaFromValidation<
 
 export type AutoFormValuesFromValidation<
   TValidation extends AutoFormValidationSchema | undefined
-> = ZodSchemaFromValidation<TValidation> extends ZodAny
+> = ZodSchemaFromValidation<TValidation> extends ZodTypeAny
   ? ZodOutput<ZodSchemaFromValidation<TValidation>> & FieldValues
   : FieldValues;
 
 export type AutoFormInputFromValidation<
   TValidation extends AutoFormValidationSchema | undefined
-> = ZodSchemaFromValidation<TValidation> extends ZodAny
+> = ZodSchemaFromValidation<TValidation> extends ZodTypeAny
   ? ZodInput<ZodSchemaFromValidation<TValidation>> & FieldValues
   : FieldValues;
 

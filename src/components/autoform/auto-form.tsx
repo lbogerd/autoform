@@ -1,22 +1,45 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import Ajv, { type ErrorObject, type ValidateFunction } from "ajv";
+import addFormats from "ajv-formats";
 import { useMemo, useState } from "react";
 import {
   FormProvider,
   useForm,
   type DefaultValues,
+  type FieldError,
+  type FieldErrorsImpl,
   type FieldValues,
   type Resolver,
 } from "react-hook-form";
 
+import type { ZodAny } from "zod";
 import { replaceRefs } from "../../lib/autoform/refs";
 import { Button } from "../ui/button";
 import type { ValidationMessageProps } from "../ui/validation-message";
 import { AutoField } from "./auto-field";
 import type {
   AutoFormInputFromValidation,
+  AutoFormJsonValidation,
   AutoFormSubmitValues,
   AutoFormValidationSchema,
   JsonSchema,
 } from "./types";
+
+const ajv = new Ajv({
+  allErrors: true,
+  strict: false,
+  strictSchema: false,
+  allowUnionTypes: true,
+  coerceTypes: true,
+});
+
+addFormats(ajv);
+
+const jsonValidatorCache = new WeakMap<JsonSchema, ValidateFunction>();
+const jsonResolverCache = new WeakMap<
+  JsonSchema,
+  Resolver<FieldValues, unknown, FieldValues>
+>();
 
 export type AutoFormProps<
   TValidation extends AutoFormValidationSchema | undefined = undefined,
@@ -41,7 +64,18 @@ export const AutoForm = <
   onSubmit,
   validationMessageProps,
 }: AutoFormProps<TValidation, TRawValues, TSubmitValues>) => {
-  const resolvedSchema = replaceRefs(schema);
+  const resolvedSchema = useMemo(() => replaceRefs(schema), [schema]);
+
+  const resolvedValidationSchema = useMemo(() => {
+    if (!validationSchema) return undefined;
+    if (validationSchema.type === "json") {
+      return {
+        ...validationSchema,
+        schema: replaceRefs(validationSchema.schema),
+      } as AutoFormJsonValidation;
+    }
+    return validationSchema;
+  }, [validationSchema]);
 
   const schemaDefaultValues = useMemo<
     DefaultValues<TRawValues> | undefined
@@ -60,9 +94,41 @@ export const AutoForm = <
   const resolver = useMemo<
     Resolver<TRawValues, unknown, TSubmitValues> | undefined
   >(() => {
-    if (!validationSchema) return undefined;
+    if (!resolvedValidationSchema) return undefined;
+    if (resolvedValidationSchema.type === "zod") {
+      const baseResolver = zodResolver(
+        resolvedValidationSchema.schema as unknown as ZodAny
+      ) as Resolver<TRawValues, unknown, TSubmitValues>;
+
+      return async (values, context, options) => {
+        const normalized = normalizeAnyOfValues(values) as TRawValues;
+        const result = await baseResolver(normalized, context, options);
+
+        const hasErrors =
+          result.errors && Object.keys(result.errors).length > 0;
+
+        if (hasErrors) {
+          return result;
+        }
+
+        const resolvedValues =
+          result.values ?? (normalized as unknown as TSubmitValues);
+
+        return {
+          values: resolvedValues,
+          errors: result.errors,
+        };
+      };
+    }
+
+    if (resolvedValidationSchema.type === "json") {
+      return createJsonSchemaResolver<TRawValues, TSubmitValues>(
+        resolvedValidationSchema.schema
+      );
+    }
+
     return undefined;
-  }, [validationSchema]);
+  }, [resolvedValidationSchema]);
 
   const form = useForm<TRawValues, unknown, TSubmitValues>({
     defaultValues: initialDefaultValues,
@@ -101,6 +167,7 @@ export const AutoForm = <
                   name={key}
                   jsonProperty={value}
                   required={requiredFields.has(key)}
+                  enforceRequired={!resolver}
                   validationMessageProps={validationMessageProps}
                 />
               </li>
@@ -292,4 +359,188 @@ function normalizeAnyOfValues<T>(values: T): T {
   }
 
   return out as unknown as T;
+}
+
+function createJsonSchemaResolver<
+  TFieldValues extends FieldValues = FieldValues,
+  TTransformedValues extends FieldValues = TFieldValues
+>(schema: JsonSchema): Resolver<TFieldValues, unknown, TTransformedValues> {
+  const cached = jsonResolverCache.get(schema);
+  if (cached) {
+    return cached as unknown as Resolver<
+      TFieldValues,
+      unknown,
+      TTransformedValues
+    >;
+  }
+
+  const validator = getJsonSchemaValidator(schema);
+
+  const resolver: Resolver<TFieldValues, unknown, TTransformedValues> = async (
+    values
+  ) => {
+    const normalized = normalizeAnyOfValues(values) as TFieldValues;
+    const isValid = validator(normalized as unknown);
+
+    if (isValid) {
+      return {
+        values: normalized as unknown as TTransformedValues,
+        errors: {} as FieldErrorsImpl<TFieldValues>,
+      };
+    }
+
+    const fieldErrors = validator.errors
+      ? ajvErrorsToFieldErrors<TFieldValues>(validator.errors)
+      : ({} as FieldErrorsImpl<TFieldValues>);
+
+    return {
+      values: {} as TTransformedValues,
+      errors: fieldErrors,
+    };
+  };
+
+  jsonResolverCache.set(
+    schema,
+    resolver as unknown as Resolver<FieldValues, unknown, FieldValues>
+  );
+
+  return resolver;
+}
+
+function getJsonSchemaValidator(schema: JsonSchema): ValidateFunction {
+  const cached = jsonValidatorCache.get(schema);
+  if (cached) return cached;
+
+  const compiled = ajv.compile(cloneJsonCompatible(schema));
+  jsonValidatorCache.set(schema, compiled);
+  return compiled;
+}
+
+function ajvErrorsToFieldErrors<TFieldValues extends FieldValues>(
+  errors: ErrorObject[]
+): FieldErrorsImpl<TFieldValues> {
+  const result: Record<string, unknown> = {};
+
+  for (const error of errors) {
+    const path = getErrorPathSegments(error);
+    if (path.length === 0) continue;
+
+    const message = formatAjvErrorMessage(error);
+    if (!message) continue;
+
+    assignErrorAtPath(result, path, {
+      type: error.keyword ?? "validation",
+      message,
+    });
+  }
+
+  return result as FieldErrorsImpl<TFieldValues>;
+}
+
+function assignErrorAtPath(
+  target: Record<string, unknown>,
+  path: string[],
+  info: { type: string; message: string }
+): void {
+  if (path.length === 0) return;
+
+  const [head, ...rest] = path;
+
+  if (rest.length === 0) {
+    const existing = target[head];
+    const merged = mergeFieldError(
+      isFieldErrorValue(existing) ? (existing as FieldError) : undefined,
+      info.type,
+      info.message
+    );
+    target[head] = merged;
+    return;
+  }
+
+  const current = target[head];
+  if (!isPlainObject(current) || isFieldErrorValue(current)) {
+    const container: Record<string, unknown> = {};
+    if (isFieldErrorValue(current)) {
+      container._errors = current;
+    }
+    target[head] = container;
+  }
+
+  assignErrorAtPath(target[head] as Record<string, unknown>, rest, info);
+}
+
+function mergeFieldError(
+  existing: FieldError | undefined,
+  type: string,
+  message: string
+): FieldError {
+  const resolvedType = existing?.type ?? type ?? "validation";
+  const types = {
+    ...(existing?.types ?? {}),
+    [type || resolvedType]: message,
+  } as Record<string, string>;
+
+  return {
+    ...existing,
+    type: resolvedType,
+    message: existing?.message ?? message,
+    types,
+  };
+}
+
+function isFieldErrorValue(value: unknown): value is FieldError {
+  if (!value || typeof value !== "object") return false;
+  return "type" in (value as Record<string, unknown>);
+}
+
+function getErrorPathSegments(error: ErrorObject): string[] {
+  const segments = (error.instancePath ?? "")
+    .split("/")
+    .filter(Boolean)
+    .map(decodeJsonPointerSegment);
+
+  const params = error.params as Record<string, unknown>;
+
+  if (typeof params.missingProperty === "string") {
+    segments.push(params.missingProperty);
+  }
+
+  if (error.keyword === "additionalProperties") {
+    const additional = params.additionalProperty;
+    if (typeof additional === "string") {
+      segments.push(additional);
+    }
+  }
+
+  return segments;
+}
+
+function decodeJsonPointerSegment(segment: string): string {
+  return segment.replace(/~1/g, "/").replace(/~0/g, "~");
+}
+
+function formatAjvErrorMessage(error: ErrorObject): string | null {
+  if (error.keyword === "required") {
+    return "This field is required.";
+  }
+
+  if (error.keyword === "additionalProperties") {
+    const params = error.params as { additionalProperty?: string };
+    if (typeof params.additionalProperty === "string") {
+      return `Unexpected property "${params.additionalProperty}".`;
+    }
+  }
+
+  if (error.keyword === "enum") {
+    const params = error.params as { allowedValues?: unknown[] };
+    if (Array.isArray(params.allowedValues)) {
+      const values = params.allowedValues
+        .map((value) => String(value))
+        .join(", ");
+      return `Must be one of: ${values}.`;
+    }
+  }
+
+  const raw = typeof error.message === "string" ? error.message.trim() : "";
+  return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : null;
 }

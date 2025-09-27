@@ -29,7 +29,7 @@ import {
 import type { JsonProperty } from "./types";
 
 const resolveSchema = (
-  schema: JsonProperty | _JSONSchema,
+  schema: JsonProperty | _JSONSchema
 ): JsonProperty | _JSONSchema => {
   if (
     typeof schema === "object" &&
@@ -45,7 +45,7 @@ const resolveSchema = (
 };
 
 const getDefaultValueForSchema = (
-  schema: JsonProperty | _JSONSchema,
+  schema: JsonProperty | _JSONSchema
 ): unknown => {
   if (typeof schema !== "object" || schema === null) {
     return null;
@@ -84,15 +84,17 @@ const getDefaultValueForSchema = (
 const ArrayField = ({
   name,
   itemSchema,
+  enforceRequired,
   validationMessageProps,
 }: {
   name: string;
   itemSchema: JsonProperty | _JSONSchema;
+  enforceRequired?: boolean;
   validationMessageProps?: Partial<Omit<ValidationMessageProps, "name" | "id">>;
 }) => {
   const resolvedItemSchema = useMemo(
     () => resolveSchema(itemSchema),
-    [itemSchema],
+    [itemSchema]
   );
 
   const { control, getValues, setValue } = useFormContext<FieldValues>();
@@ -118,6 +120,7 @@ const ArrayField = ({
               <AutoField
                 name={`${name}.${index}`}
                 jsonProperty={resolvedItemSchema}
+                enforceRequired={enforceRequired}
                 validationMessageProps={validationMessageProps}
               />
             </div>
@@ -143,12 +146,14 @@ export const AutoField = ({
   jsonProperty,
   required,
   inputId,
+  enforceRequired = true,
   validationMessageProps,
 }: {
   name: string;
   jsonProperty: JsonProperty | _JSONSchema;
   required?: boolean;
   inputId?: string;
+  enforceRequired?: boolean;
   validationMessageProps?: Partial<Omit<ValidationMessageProps, "name" | "id">>;
 }) => {
   const { control, register, getFieldState } = useFormContext<FieldValues>();
@@ -163,9 +168,9 @@ export const AutoField = ({
   const describedBy = error ? messageId : undefined;
 
   const validationRules = useMemo(() => {
-    if (!required) return undefined;
+    if (!required || !enforceRequired) return undefined;
     return { required: "This field is required." } as const;
-  }, [required]);
+  }, [required, enforceRequired]);
 
   // Handle anyOf BEFORE resolving the schema to first option
   if (
@@ -180,6 +185,7 @@ export const AutoField = ({
         parentName={name}
         options={jsonProperty.anyOf}
         required={required}
+        enforceRequired={enforceRequired}
         validationMessageProps={validationMessageProps}
       />
     );
@@ -225,7 +231,7 @@ export const AutoField = ({
         rules={validationRules}
         render={({ field }) => {
           const selected = options.find((option) =>
-            Object.is(option.value, field.value),
+            Object.is(option.value, field.value)
           );
 
           return (
@@ -253,7 +259,7 @@ export const AutoField = ({
             </Select>
           );
         }}
-      />,
+      />
     );
   }
 
@@ -269,7 +275,7 @@ export const AutoField = ({
 
       if (!items) {
         return appendValidationMessage(
-          <span className="text-muted-foreground">[]</span>,
+          <span className="text-muted-foreground">[]</span>
         );
       }
 
@@ -278,8 +284,9 @@ export const AutoField = ({
           <ArrayField
             name={name}
             itemSchema={items[0] ?? {}}
+            enforceRequired={enforceRequired}
             validationMessageProps={validationMessageProps}
-          />,
+          />
         );
       }
 
@@ -288,8 +295,9 @@ export const AutoField = ({
           <ArrayField
             name={name}
             itemSchema={{ type: "string" }}
+            enforceRequired={enforceRequired}
             validationMessageProps={validationMessageProps}
-          />,
+          />
         );
       }
 
@@ -297,8 +305,9 @@ export const AutoField = ({
         <ArrayField
           name={name}
           itemSchema={items}
+          enforceRequired={enforceRequired}
           validationMessageProps={validationMessageProps}
-        />,
+        />
       );
     }
 
@@ -317,12 +326,12 @@ export const AutoField = ({
         objectSchema.additionalProperties === false
           ? undefined
           : objectSchema.additionalProperties === true
-            ? { type: "string" }
-            : objectSchema.additionalProperties;
+          ? { type: "string" }
+          : objectSchema.additionalProperties;
 
       if (!hasStaticProps && !additionalSchema) {
         return appendValidationMessage(
-          <span className="text-muted-foreground">{`{ }`}</span>,
+          <span className="text-muted-foreground">{`{ }`}</span>
         );
       }
 
@@ -345,6 +354,7 @@ export const AutoField = ({
                     name={`${name}.${key}`}
                     jsonProperty={value}
                     required={requiredKeys.has(key)}
+                    enforceRequired={enforceRequired}
                     validationMessageProps={validationMessageProps}
                   />
                 </li>
@@ -359,7 +369,7 @@ export const AutoField = ({
               validationMessageProps={validationMessageProps}
             />
           ) : null}
-        </div>,
+        </div>
       );
     }
 
@@ -378,7 +388,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />,
+            />
           );
         case "uri":
           return appendValidationMessage(
@@ -389,7 +399,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />,
+            />
           );
         case "date-time":
           return appendValidationMessage(
@@ -400,7 +410,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />,
+            />
           );
         case "date":
           return appendValidationMessage(
@@ -411,7 +421,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />,
+            />
           );
         case "time":
           return appendValidationMessage(
@@ -423,7 +433,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />,
+            />
           );
         default:
           return appendValidationMessage(
@@ -434,7 +444,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />,
+            />
           );
       }
     }
@@ -452,7 +462,7 @@ export const AutoField = ({
             valueAsNumber: true,
             ...(validationRules ?? {}),
           })}
-        />,
+        />
       );
 
     case "boolean":
@@ -471,7 +481,7 @@ export const AutoField = ({
               onCheckedChange={(checked) => field.onChange(Boolean(checked))}
             />
           )}
-        />,
+        />
       );
 
     case "null":
@@ -486,11 +496,13 @@ function AnyOfTabs({
   parentName,
   options,
   required,
+  enforceRequired,
   validationMessageProps,
 }: {
   parentName: string;
   options: Array<JsonProperty | _JSONSchema>;
   required?: boolean;
+  enforceRequired?: boolean;
   validationMessageProps?: Partial<Omit<ValidationMessageProps, "name" | "id">>;
 }) {
   const [active, setActive] = useState("0");
@@ -542,6 +554,7 @@ function AnyOfTabs({
             jsonProperty={opt}
             required={required}
             inputId={parentName}
+            enforceRequired={enforceRequired}
             validationMessageProps={validationMessageProps}
           />
         </TabsContent>
@@ -567,7 +580,7 @@ function AdditionalPropertiesField({
   const watchedValue = useWatch({ name: parentName });
   const addInputId = useMemo(
     () => `${parentName}.__newKey`.replace(/[^a-zA-Z0-9_-]+/g, "-"),
-    [parentName],
+    [parentName]
   );
 
   useEffect(() => {
@@ -585,7 +598,7 @@ function AdditionalPropertiesField({
   const dynamicKeys = useMemo(() => {
     if (!watchedValue || typeof watchedValue !== "object") return [];
     return Object.keys(watchedValue as Record<string, unknown>).filter(
-      (key) => !reservedSet.has(key) && !key.startsWith("__"),
+      (key) => !reservedSet.has(key) && !key.startsWith("__")
     );
   }, [reservedSet, watchedValue]);
 
@@ -668,6 +681,7 @@ function AdditionalPropertiesField({
                 name={`${parentName}.${key}`}
                 jsonProperty={schema}
                 inputId={`${parentName}.${key}`}
+                enforceRequired={false}
                 validationMessageProps={validationMessageProps}
               />
             </li>
