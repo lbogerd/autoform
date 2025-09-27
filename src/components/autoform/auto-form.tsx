@@ -1,45 +1,82 @@
 import { useMemo, useState } from "react";
-import { FormProvider, useForm, type FieldValues } from "react-hook-form";
+import {
+  FormProvider,
+  useForm,
+  type DefaultValues,
+  type FieldValues,
+  type Resolver,
+} from "react-hook-form";
 
-import { Button } from "../ui/button";
-import { AutoField } from "./auto-field";
 import { replaceRefs } from "../../lib/autoform/refs";
-import type { JsonSchema } from "./types";
+import { Button } from "../ui/button";
 import type { ValidationMessageProps } from "../ui/validation-message";
+import { AutoField } from "./auto-field";
+import type {
+  AutoFormInputFromValidation,
+  AutoFormSubmitValues,
+  AutoFormValidationSchema,
+  JsonSchema,
+} from "./types";
 
-export type AutoFormProps = {
+export type AutoFormProps<
+  TValidation extends AutoFormValidationSchema | undefined = undefined,
+  TRawValues extends FieldValues = AutoFormInputFromValidation<TValidation>,
+  TSubmitValues extends FieldValues = AutoFormSubmitValues<TValidation>
+> = {
   schema: JsonSchema;
-  defaultValues?: FieldValues;
-  onSubmit?: (values: FieldValues) => void;
+  defaultValues?: DefaultValues<TRawValues>;
+  validationSchema?: TValidation;
+  onSubmit?: (values: TSubmitValues) => void;
   validationMessageProps?: Partial<Omit<ValidationMessageProps, "name" | "id">>;
 };
 
-export const AutoForm = ({
+export const AutoForm = <
+  TValidation extends AutoFormValidationSchema | undefined = undefined,
+  TRawValues extends FieldValues = AutoFormInputFromValidation<TValidation>,
+  TSubmitValues extends FieldValues = AutoFormSubmitValues<TValidation>
+>({
   schema,
   defaultValues,
+  validationSchema,
   onSubmit,
   validationMessageProps,
-}: AutoFormProps) => {
+}: AutoFormProps<TValidation, TRawValues, TSubmitValues>) => {
   const resolvedSchema = replaceRefs(schema);
-  const schemaDefaultValues = useMemo(() => {
+
+  const schemaDefaultValues = useMemo<
+    DefaultValues<TRawValues> | undefined
+  >(() => {
     const extracted = extractDefaultsFromSchema(resolvedSchema);
-    return isPlainObject(extracted) ? (extracted as FieldValues) : undefined;
+    return isPlainObject(extracted)
+      ? (extracted as DefaultValues<TRawValues>)
+      : undefined;
   }, [resolvedSchema]);
-  const initialDefaultValues = useMemo(
+
+  const initialDefaultValues = useMemo<DefaultValues<TRawValues> | undefined>(
     () => mergeDefaultValues(schemaDefaultValues, defaultValues),
-    [schemaDefaultValues, defaultValues],
+    [schemaDefaultValues, defaultValues]
   );
-  const form = useForm<FieldValues>({
+
+  const resolver = useMemo<
+    Resolver<TRawValues, unknown, TSubmitValues> | undefined
+  >(() => {
+    if (!validationSchema) return undefined;
+    return undefined;
+  }, [validationSchema]);
+
+  const form = useForm<TRawValues, unknown, TSubmitValues>({
     defaultValues: initialDefaultValues,
     mode: "onChange",
     reValidateMode: "onChange",
     criteriaMode: "all",
+    resolver,
   });
+
   const [lastSubmittedValues, setLastSubmittedValues] =
-    useState<FieldValues | null>(null);
+    useState<TSubmitValues | null>(null);
 
   const handleSubmit = form.handleSubmit((values) => {
-    const normalized = normalizeAnyOfValues(values) as FieldValues;
+    const normalized = normalizeAnyOfValues(values);
     setLastSubmittedValues(normalized);
     onSubmit?.(normalized);
   });
@@ -67,7 +104,7 @@ export const AutoForm = ({
                   validationMessageProps={validationMessageProps}
                 />
               </li>
-            ),
+            )
           )}
         </ul>
 
@@ -115,7 +152,7 @@ const extractDefaultsFromSchema = (schema: unknown): unknown => {
     }
 
     const optionDefaults = anyOf.map((option) =>
-      extractDefaultsFromSchema(option),
+      extractDefaultsFromSchema(option)
     );
     if (optionDefaults.some((value) => value !== undefined)) {
       return {
@@ -162,25 +199,29 @@ const extractDefaultsFromSchema = (schema: unknown): unknown => {
   return defaultValue;
 };
 
-const mergeDefaultValues = (
-  schemaDefaults: FieldValues | undefined,
-  providedDefaults: FieldValues | undefined,
-): FieldValues | undefined => {
+const mergeDefaultValues = <TValues extends FieldValues>(
+  schemaDefaults: DefaultValues<TValues> | undefined,
+  providedDefaults: DefaultValues<TValues> | undefined
+): DefaultValues<TValues> | undefined => {
   if (!schemaDefaults && !providedDefaults) return undefined;
   if (!schemaDefaults)
-    return cloneJsonCompatible(providedDefaults) as FieldValues;
+    return cloneJsonCompatible(providedDefaults) as DefaultValues<TValues>;
   if (!providedDefaults)
-    return cloneJsonCompatible(schemaDefaults) as FieldValues;
+    return cloneJsonCompatible(schemaDefaults) as DefaultValues<TValues>;
+
+  if (!isPlainObject(schemaDefaults) || !isPlainObject(providedDefaults)) {
+    return cloneJsonCompatible(providedDefaults) as DefaultValues<TValues>;
+  }
 
   return mergeDeep(
     cloneJsonCompatible(schemaDefaults) as Record<string, unknown>,
-    providedDefaults as Record<string, unknown>,
-  ) as FieldValues;
+    providedDefaults as Record<string, unknown>
+  ) as DefaultValues<TValues>;
 };
 
 const mergeDeep = (
   base: Record<string, unknown>,
-  override: Record<string, unknown>,
+  override: Record<string, unknown>
 ): Record<string, unknown> => {
   const result: Record<string, unknown> = { ...base };
 
@@ -190,7 +231,7 @@ const mergeDeep = (
     if (isPlainObject(existing) && isPlainObject(value)) {
       result[key] = mergeDeep(
         existing as Record<string, unknown>,
-        value as Record<string, unknown>,
+        value as Record<string, unknown>
       );
       continue;
     }
@@ -226,35 +267,29 @@ const cloneJsonCompatible = <T,>(value: T): T => {
   return value;
 };
 
-function normalizeAnyOfValues(values: unknown): unknown {
+function normalizeAnyOfValues<T>(values: T): T {
   if (values == null || typeof values !== "object") return values;
 
   if (Array.isArray(values)) {
-    return values.map((v) => normalizeAnyOfValues(v));
+    return values.map((v) => normalizeAnyOfValues(v)) as unknown as T;
   }
 
   const obj = values as Record<string, unknown>;
 
-  // Handle leaf anyOf container pattern: { __anyOf: [...], __anyOfIndex: "i" }
   if ("__anyOf" in obj && Array.isArray(obj.__anyOf)) {
     const idxRaw = obj.__anyOfIndex;
     const idx =
       typeof idxRaw === "string" ? parseInt(idxRaw, 10) : Number(idxRaw ?? 0);
     const chosen = obj.__anyOf[idx] ?? obj.__anyOf[0];
-    return normalizeAnyOfValues(chosen);
+    return normalizeAnyOfValues(chosen) as unknown as T;
   }
 
-  // Recurse into children, and collapse nested anyOf values
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(obj)) {
     if (k === "__anyOf" || k === "__anyOfIndex") continue;
 
-    // If child is an anyOf container rendered via AnyOfTabs, we expect
-    // a structure like v = { __anyOf: [...], __anyOfIndex: ... } or an object containing it.
     out[k] = normalizeAnyOfValues(v);
   }
 
-  // Special case: if this object contains only an __anyOf subobject under some key
-  // handled by recursion above, the child recursion will have collapsed it already.
-  return out;
+  return out as unknown as T;
 }
