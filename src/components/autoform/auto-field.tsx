@@ -29,7 +29,7 @@ import {
 import type { JsonProperty } from "./types";
 
 const resolveSchema = (
-  schema: JsonProperty | _JSONSchema
+  schema: JsonProperty | _JSONSchema,
 ): JsonProperty | _JSONSchema => {
   if (
     typeof schema === "object" &&
@@ -45,7 +45,7 @@ const resolveSchema = (
 };
 
 const getDefaultValueForSchema = (
-  schema: JsonProperty | _JSONSchema
+  schema: JsonProperty | _JSONSchema,
 ): unknown => {
   if (typeof schema !== "object" || schema === null) {
     return null;
@@ -92,7 +92,7 @@ const ArrayField = ({
 }) => {
   const resolvedItemSchema = useMemo(
     () => resolveSchema(itemSchema),
-    [itemSchema]
+    [itemSchema],
   );
 
   const { control, getValues, setValue } = useFormContext<FieldValues>();
@@ -225,7 +225,7 @@ export const AutoField = ({
         rules={validationRules}
         render={({ field }) => {
           const selected = options.find((option) =>
-            Object.is(option.value, field.value)
+            Object.is(option.value, field.value),
           );
 
           return (
@@ -253,7 +253,7 @@ export const AutoField = ({
             </Select>
           );
         }}
-      />
+      />,
     );
   }
 
@@ -269,7 +269,7 @@ export const AutoField = ({
 
       if (!items) {
         return appendValidationMessage(
-          <span className="text-muted-foreground">[]</span>
+          <span className="text-muted-foreground">[]</span>,
         );
       }
 
@@ -279,7 +279,7 @@ export const AutoField = ({
             name={name}
             itemSchema={items[0] ?? {}}
             validationMessageProps={validationMessageProps}
-          />
+          />,
         );
       }
 
@@ -289,7 +289,7 @@ export const AutoField = ({
             name={name}
             itemSchema={{ type: "string" }}
             validationMessageProps={validationMessageProps}
-          />
+          />,
         );
       }
 
@@ -298,7 +298,7 @@ export const AutoField = ({
           name={name}
           itemSchema={items}
           validationMessageProps={validationMessageProps}
-        />
+        />,
       );
     }
 
@@ -317,12 +317,12 @@ export const AutoField = ({
         objectSchema.additionalProperties === false
           ? undefined
           : objectSchema.additionalProperties === true
-          ? { type: "string" }
-          : objectSchema.additionalProperties;
+            ? { type: "string" }
+            : objectSchema.additionalProperties;
 
       if (!hasStaticProps && !additionalSchema) {
         return appendValidationMessage(
-          <span className="text-muted-foreground">{`{ }`}</span>
+          <span className="text-muted-foreground">{`{ }`}</span>,
         );
       }
 
@@ -359,7 +359,7 @@ export const AutoField = ({
               validationMessageProps={validationMessageProps}
             />
           ) : null}
-        </div>
+        </div>,
       );
     }
 
@@ -378,7 +378,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />
+            />,
           );
         case "uri":
           return appendValidationMessage(
@@ -389,7 +389,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />
+            />,
           );
         case "date-time":
           return appendValidationMessage(
@@ -400,7 +400,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />
+            />,
           );
         case "date":
           return appendValidationMessage(
@@ -411,7 +411,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />
+            />,
           );
         case "time":
           return appendValidationMessage(
@@ -423,7 +423,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />
+            />,
           );
         default:
           return appendValidationMessage(
@@ -434,7 +434,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />
+            />,
           );
       }
     }
@@ -452,7 +452,7 @@ export const AutoField = ({
             valueAsNumber: true,
             ...(validationRules ?? {}),
           })}
-        />
+        />,
       );
 
     case "boolean":
@@ -471,7 +471,7 @@ export const AutoField = ({
               onCheckedChange={(checked) => field.onChange(Boolean(checked))}
             />
           )}
-        />
+        />,
       );
 
     case "null":
@@ -567,7 +567,7 @@ function AdditionalPropertiesField({
   const watchedValue = useWatch({ name: parentName });
   const addInputId = useMemo(
     () => `${parentName}.__newKey`.replace(/[^a-zA-Z0-9_-]+/g, "-"),
-    [parentName]
+    [parentName],
   );
 
   useEffect(() => {
@@ -585,7 +585,7 @@ function AdditionalPropertiesField({
   const dynamicKeys = useMemo(() => {
     if (!watchedValue || typeof watchedValue !== "object") return [];
     return Object.keys(watchedValue as Record<string, unknown>).filter(
-      (key) => !reservedSet.has(key) && !key.startsWith("__")
+      (key) => !reservedSet.has(key) && !key.startsWith("__"),
     );
   }, [reservedSet, watchedValue]);
 

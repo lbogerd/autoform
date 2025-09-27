@@ -66,6 +66,62 @@ describe("AutoForm", () => {
     expect(handleSubmit).toHaveBeenCalledWith({ name: "Alice", optIn: true });
   });
 
+  it("uses schema defaults as initial values", () => {
+    render(
+      <AutoForm
+        schema={{
+          type: "object",
+          properties: {
+            name: { type: "string", default: "Alice" },
+            newsletter: { type: "boolean", default: true },
+            settings: {
+              type: "object",
+              properties: {
+                timezone: { type: "string", default: "UTC" },
+                count: { type: "integer", default: 3 },
+              },
+            },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByLabelText(/name/i)).toHaveValue("Alice");
+    expect(screen.getByLabelText(/newsletter/i)).toBeChecked();
+    expect(screen.getByLabelText(/timezone/i)).toHaveValue("UTC");
+    expect(screen.getByLabelText(/count/i)).toHaveValue(3);
+  });
+
+  it("prefers explicit defaultValues over schema defaults", () => {
+    render(
+      <AutoForm
+        schema={{
+          type: "object",
+          properties: {
+            name: { type: "string", default: "Alice" },
+            newsletter: { type: "boolean", default: true },
+            settings: {
+              type: "object",
+              properties: {
+                timezone: { type: "string", default: "UTC" },
+                count: { type: "integer", default: 3 },
+              },
+            },
+          },
+        }}
+        defaultValues={{
+          name: "Override",
+          settings: { count: 10 },
+        }}
+      />,
+    );
+
+    expect(screen.getByLabelText(/name/i)).toHaveValue("Override");
+    expect(screen.getByLabelText(/newsletter/i)).toBeChecked();
+    expect(screen.getByLabelText(/timezone/i)).toHaveValue("UTC");
+    expect(screen.getByLabelText(/count/i)).toHaveValue(10);
+  });
+
   it("allows adding and removing array items", async () => {
     const user = userEvent.setup();
 

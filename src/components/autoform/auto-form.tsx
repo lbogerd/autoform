@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { FormProvider, useForm, type FieldValues } from "react-hook-form";
 
 import { Button } from "../ui/button";
@@ -21,8 +21,16 @@ export const AutoForm = ({
   validationMessageProps,
 }: AutoFormProps) => {
   const resolvedSchema = replaceRefs(schema);
+  const schemaDefaultValues = useMemo(() => {
+    const extracted = extractDefaultsFromSchema(resolvedSchema);
+    return isPlainObject(extracted) ? (extracted as FieldValues) : undefined;
+  }, [resolvedSchema]);
+  const initialDefaultValues = useMemo(
+    () => mergeDefaultValues(schemaDefaultValues, defaultValues),
+    [schemaDefaultValues, defaultValues],
+  );
   const form = useForm<FieldValues>({
-    defaultValues,
+    defaultValues: initialDefaultValues,
     mode: "onChange",
     reValidateMode: "onChange",
     criteriaMode: "all",
@@ -89,6 +97,133 @@ export const AutoForm = ({
       </form>
     </FormProvider>
   );
+};
+
+const extractDefaultsFromSchema = (schema: unknown): unknown => {
+  if (!isPlainObject(schema)) return undefined;
+
+  const node = schema as Record<string, unknown>;
+  const hasDefault = Object.prototype.hasOwnProperty.call(node, "default");
+  const defaultValue = hasDefault
+    ? cloneJsonCompatible(node.default)
+    : undefined;
+
+  const anyOf = Array.isArray(node.anyOf) ? node.anyOf : undefined;
+  if (anyOf && anyOf.length > 0) {
+    if (defaultValue !== undefined) {
+      return defaultValue;
+    }
+
+    const optionDefaults = anyOf.map((option) =>
+      extractDefaultsFromSchema(option),
+    );
+    if (optionDefaults.some((value) => value !== undefined)) {
+      return {
+        __anyOf: optionDefaults,
+        __anyOfIndex: "0",
+      } satisfies Record<string, unknown>;
+    }
+
+    return undefined;
+  }
+
+  const rawType = node.type;
+  if (rawType === "object") {
+    const properties = isPlainObject(node.properties)
+      ? (node.properties as Record<string, unknown>)
+      : undefined;
+
+    let result: Record<string, unknown> | undefined;
+
+    if (defaultValue !== undefined) {
+      if (!isPlainObject(defaultValue)) {
+        return defaultValue;
+      }
+      result = cloneJsonCompatible(defaultValue) as Record<string, unknown>;
+    }
+
+    if (properties) {
+      for (const [key, value] of Object.entries(properties)) {
+        const childDefault = extractDefaultsFromSchema(value);
+        if (childDefault !== undefined) {
+          if (!result) {
+            result = {};
+          }
+          if (result[key] === undefined) {
+            result[key] = childDefault;
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
+  return defaultValue;
+};
+
+const mergeDefaultValues = (
+  schemaDefaults: FieldValues | undefined,
+  providedDefaults: FieldValues | undefined,
+): FieldValues | undefined => {
+  if (!schemaDefaults && !providedDefaults) return undefined;
+  if (!schemaDefaults)
+    return cloneJsonCompatible(providedDefaults) as FieldValues;
+  if (!providedDefaults)
+    return cloneJsonCompatible(schemaDefaults) as FieldValues;
+
+  return mergeDeep(
+    cloneJsonCompatible(schemaDefaults) as Record<string, unknown>,
+    providedDefaults as Record<string, unknown>,
+  ) as FieldValues;
+};
+
+const mergeDeep = (
+  base: Record<string, unknown>,
+  override: Record<string, unknown>,
+): Record<string, unknown> => {
+  const result: Record<string, unknown> = { ...base };
+
+  for (const [key, value] of Object.entries(override)) {
+    const existing = result[key];
+
+    if (isPlainObject(existing) && isPlainObject(value)) {
+      result[key] = mergeDeep(
+        existing as Record<string, unknown>,
+        value as Record<string, unknown>,
+      );
+      continue;
+    }
+
+    result[key] = value;
+  }
+
+  return result;
+};
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const cloneJsonCompatible = <T,>(value: T): T => {
+  if (value === undefined || value === null) {
+    return value;
+  }
+
+  const structuredCloneImpl = (
+    globalThis as {
+      structuredClone?: <U>(input: U) => U;
+    }
+  ).structuredClone;
+
+  if (typeof structuredCloneImpl === "function") {
+    return structuredCloneImpl(value);
+  }
+
+  if (typeof value === "object") {
+    return JSON.parse(JSON.stringify(value)) as T;
+  }
+
+  return value;
 };
 
 function normalizeAnyOfValues(values: unknown): unknown {
