@@ -9,11 +9,11 @@ feeding it with the output of [`z.toJSONSchema`](https://zod.dev/?id=json-schema
 ## Overview
 
 - **Input:** a JSON Schema object. Internally the component resolves `$ref` values defined in `$defs` so that reused fields become
-directly renderable (`replaceRefs` in [`auto-form.tsx`](src/components/autoform/auto-form.tsx)).
+  directly renderable (`replaceRefs` in [`auto-form.tsx`](src/components/autoform/auto-form.tsx)).
 - **Renderer:** [`AutoField`](src/components/autoform/auto-field.tsx) picks a basic control for each property based on its `type`,
-`format`, and helpers like `enum`, `anyOf`, and `additionalProperties`.
+  `format`, and helpers like `enum`, `anyOf`, and `additionalProperties`.
 - **Form wiring:** [`AutoForm`](src/components/autoform/auto-form.tsx) integrates with React Hook Form, visually marks required
-fields based on the JSON Schema `required` array, and exposes submission/reset hooks for consumers.
+  fields based on the JSON Schema `required` array, and exposes submission/reset hooks for consumers.
 - **Status:** intentionally lightweight – validation/submission beyond the provided wiring is still evolving for this prototype.
 
 ---
@@ -28,7 +28,7 @@ The renderer covers the pieces of JSON Schema that fall out of the Zod v4 conver
 - Enumerations become a Radix `Select` listing the available options.
 - Arrays display the schema for the first item (tuples pick the first entry, homogeneous arrays reuse the item schema).
 - Objects with explicit `properties` render nested lists; record-like objects that use `additionalProperties` show a key/value row
-and respect any `propertyNames.pattern` constraint for the key field.
+  and respect any `propertyNames.pattern` constraint for the key field.
 - `anyOf` chooses the first option for now (future work could surface all variants).
 - The literal `null` type renders as a static "null" placeholder.
 

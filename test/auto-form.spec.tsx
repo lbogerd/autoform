@@ -28,7 +28,7 @@ describe("AutoForm $ref handling", () => {
             contact: { $ref: "#/$defs/Email" },
           },
         }}
-      />
+      />,
     );
 
     expect(screen.getByRole("textbox")).toHaveAttribute("type", "email");
@@ -47,13 +47,11 @@ describe("AutoForm $ref handling", () => {
             missing: { $ref: "#/$defs/Nope" },
           },
         }}
-      />
+      />,
     );
 
     expect(
-      screen.getByText(
-        'No type found: {"$ref":"#/$defs/Nope"}'
-      )
+      screen.getByText('No type found: {"$ref":"#/$defs/Nope"}'),
     ).toBeInTheDocument();
   });
 });

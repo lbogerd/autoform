@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 type RenderBaseContext<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 > = {
   id: string;
   name: TName;
@@ -23,14 +23,14 @@ type RenderBaseContext<
 
 type RenderContext<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 > = RenderBaseContext<TFieldValues, TName> & {
   icon: ReactNode | null;
 };
 
 type IconProp<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 > =
   | null
   | false
@@ -39,7 +39,7 @@ type IconProp<
 
 export type ValidationMessageProps<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 > = React.HTMLAttributes<HTMLDivElement> & {
   name: TName;
   id?: string;
@@ -90,7 +90,15 @@ const collectErrorMessages = (error: unknown): string[] => {
       Object.values(types as Record<string, unknown>).forEach(visit);
     }
 
-    const SKIP_KEYS = new Set(["message", "types", "type", "ref", "root", "name", "_f"]);
+    const SKIP_KEYS = new Set([
+      "message",
+      "types",
+      "type",
+      "ref",
+      "root",
+      "name",
+      "_f",
+    ]);
 
     for (const [key, value] of Object.entries(record)) {
       if (SKIP_KEYS.has(key)) continue;
@@ -122,11 +130,11 @@ export const ValidationMessage = forwardRef<
 
   const shouldDisplay = Boolean(
     !!error &&
-    (isTouched ||
-      isDirty ||
-      formState.isSubmitted ||
-      formState.submitCount > 0 ||
-      isManualError)
+      (isTouched ||
+        isDirty ||
+        formState.isSubmitted ||
+        formState.submitCount > 0 ||
+        isManualError),
   );
 
   if (!shouldDisplay) {
@@ -134,7 +142,7 @@ export const ValidationMessage = forwardRef<
   }
 
   const messages = collectErrorMessages(
-    error as FieldError | FieldErrorsImpl<FieldValues>
+    error as FieldError | FieldErrorsImpl<FieldValues>,
   );
 
   if (messages.length === 0) {
@@ -155,8 +163,8 @@ export const ValidationMessage = forwardRef<
     icon === false || icon === null
       ? null
       : typeof icon === "function"
-      ? icon(baseContext)
-      : icon ?? <AlertCircle className="size-4" aria-hidden="true" />;
+        ? icon(baseContext)
+        : (icon ?? <AlertCircle className="size-4" aria-hidden="true" />);
 
   const renderContext: RenderContext = {
     ...baseContext,
@@ -177,7 +185,7 @@ export const ValidationMessage = forwardRef<
       data-slot="validation-message"
       className={cn(
         "mt-1 flex items-start gap-2 text-sm text-destructive",
-        className
+        className,
       )}
       {...rest}
     >

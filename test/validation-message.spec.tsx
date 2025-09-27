@@ -74,7 +74,7 @@ describe("ValidationMessage", () => {
 
     expect(screen.getByText("Something went wrong")).toBeInTheDocument();
     expect(
-      screen.getByRole("alert").querySelector('[data-slot="validation-icon"]')
+      screen.getByRole("alert").querySelector('[data-slot="validation-icon"]'),
     ).not.toBeNull();
   });
 
@@ -86,7 +86,7 @@ describe("ValidationMessage", () => {
           className: "text-sky-500",
           icon: <span data-testid="custom-icon">!</span>,
         }}
-      />
+      />,
     );
 
     const alert = await screen.findByRole("alert");
@@ -104,7 +104,7 @@ describe("ValidationMessage", () => {
             pattern: "Only letters are allowed",
           },
         }}
-      />
+      />,
     );
 
     const alert = await screen.findByRole("alert");
@@ -140,11 +140,11 @@ describe("ValidationMessage", () => {
             </div>
           ),
         }}
-      />
+      />,
     );
 
     expect(await screen.findByTestId("custom-render")).toHaveTextContent(
-      "Custom render"
+      "Custom render",
     );
   });
 });

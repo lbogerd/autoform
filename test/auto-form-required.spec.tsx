@@ -38,7 +38,7 @@ describe("AutoForm required field marking", () => {
           },
           required: ["name", "website"],
         }}
-      />
+      />,
     );
 
     const nameLabel = screen.getByText(/name/i, { selector: "label" });
@@ -74,7 +74,7 @@ describe("AutoForm required field marking", () => {
           },
           required: ["person"],
         }}
-      />
+      />,
     );
 
     // Top-level label for the object should indicate required
@@ -88,14 +88,14 @@ describe("AutoForm required field marking", () => {
     expect(firstNameLabel).toHaveTextContent(/firstName\*/i);
     expect(screen.getByLabelText(/firstName/i)).toHaveAttribute(
       "aria-required",
-      "true"
+      "true",
     );
 
     const lastNameLabel = screen.getByText(/lastName/i, { selector: "label" });
     expect(lastNameLabel).not.toHaveTextContent(/\*$/);
     expect(screen.getByLabelText(/lastName/i)).not.toHaveAttribute(
       "aria-required",
-      "true"
+      "true",
     );
   });
 
@@ -110,7 +110,7 @@ describe("AutoForm required field marking", () => {
           },
           required: ["tags"],
         }}
-      />
+      />,
     );
 
     const tagsLabel = screen.getByText(/tags/i, { selector: "label" });
@@ -133,7 +133,7 @@ describe("AutoForm required field marking", () => {
           },
           required: ["role", "agree"],
         }}
-      />
+      />,
     );
 
     // SelectTrigger is the button role; check aria-required on it

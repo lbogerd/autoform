@@ -28,7 +28,7 @@ describe("Base tests", () => {
     const resolvedSchema = replaceRefs(jsonSchemaWithRefs);
 
     expect(resolvedSchema.properties).toEqual(
-      z.toJSONSchema(FakeUser, { reused: "inline" }).properties
+      z.toJSONSchema(FakeUser, { reused: "inline" }).properties,
     );
   });
 });

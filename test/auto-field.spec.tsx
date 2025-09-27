@@ -1,11 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import {
-  FormProvider,
-  useForm,
-  type FieldValues,
-} from "react-hook-form";
+import { FormProvider, useForm, type FieldValues } from "react-hook-form";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { AutoField } from "../src/components/autoform/auto-field";
@@ -52,7 +48,10 @@ beforeAll(() => {
     disconnect() {}
   }
 
-  if (typeof (globalThis as { ResizeObserver?: unknown }).ResizeObserver === "undefined") {
+  if (
+    typeof (globalThis as { ResizeObserver?: unknown }).ResizeObserver ===
+    "undefined"
+  ) {
     (globalThis as { ResizeObserver?: unknown }).ResizeObserver =
       MockResizeObserver as unknown as typeof ResizeObserver;
   }
@@ -64,10 +63,12 @@ afterEach(() => {
 
 describe("AutoField", () => {
   it("renders a fallback message when the provided schema is not an object", () => {
-    renderAutoField({ schema: "not-a-schema" as unknown as AutoFieldProps["jsonProperty"] });
+    renderAutoField({
+      schema: "not-a-schema" as unknown as AutoFieldProps["jsonProperty"],
+    });
 
     expect(
-      screen.getByText(/Invalid property schema: "not-a-schema"/i)
+      screen.getByText(/Invalid property schema: "not-a-schema"/i),
     ).toBeInTheDocument();
   });
 
@@ -80,7 +81,7 @@ describe("AutoField", () => {
 
     expect(screen.getByRole("tab", { name: /string/i })).toHaveAttribute(
       "aria-selected",
-      "true"
+      "true",
     );
     expect(screen.getByRole("textbox")).toHaveAttribute("type", "text");
   });
@@ -127,7 +128,9 @@ describe("AutoField", () => {
       },
     });
 
-    expect(screen.getByText(/title/i, { selector: "label" })).toBeInTheDocument();
+    expect(
+      screen.getByText(/title/i, { selector: "label" }),
+    ).toBeInTheDocument();
   });
 
   it("shows a placeholder message for record-style objects", () => {
@@ -139,7 +142,7 @@ describe("AutoField", () => {
     });
 
     expect(
-      screen.getByText(/Record-style objects are not yet supported/i)
+      screen.getByText(/Record-style objects are not yet supported/i),
     ).toBeInTheDocument();
   });
 

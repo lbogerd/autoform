@@ -34,7 +34,7 @@ describe("AutoForm", () => {
             contact: { $ref: "#/$defs/Email" },
           },
         }}
-      />
+      />,
     );
 
     expect(screen.getByRole("textbox")).toHaveAttribute("type", "email");
@@ -55,7 +55,7 @@ describe("AutoForm", () => {
           },
           required: ["name", "optIn"],
         }}
-      />
+      />,
     );
 
     await user.type(screen.getByLabelText(/name/i), "Alice");
@@ -80,7 +80,7 @@ describe("AutoForm", () => {
             },
           },
         }}
-      />
+      />,
     );
 
     const addButton = screen.getByRole("button", { name: /add item/i });
@@ -124,7 +124,7 @@ describe("AutoForm", () => {
           name: "Initial",
           tags: ["existing"],
         }}
-      />
+      />,
     );
 
     const nameInput = screen.getByLabelText(/name/i);
@@ -167,7 +167,7 @@ describe("AutoForm", () => {
             },
           },
         }}
-      />
+      />,
     );
 
     // Tabs and default selection
@@ -200,7 +200,7 @@ describe("AutoForm", () => {
             },
           },
         }}
-      />
+      />,
     );
 
     await user.type(screen.getByLabelText(/value/i), "hello");
@@ -231,7 +231,7 @@ describe("AutoForm", () => {
           },
           required: ["choice"],
         }}
-      />
+      />,
     );
 
     // Enter text, then switch to boolean and check it, then submit
@@ -269,7 +269,7 @@ describe("AutoForm", () => {
           },
           required: ["person"],
         }}
-      />
+      />,
     );
 
     // Default is Email tab; enter email, switch to ID and type a number, then back to Email
@@ -298,7 +298,7 @@ describe("AutoForm", () => {
           },
           required: ["name"],
         }}
-      />
+      />,
     );
 
     await user.click(screen.getByRole("button", { name: "Submit" }));
@@ -312,7 +312,7 @@ describe("AutoForm", () => {
 
     await waitFor(() => {
       expect(
-        screen.queryByText("This field is required.")
+        screen.queryByText("This field is required."),
       ).not.toBeInTheDocument();
     });
 
@@ -332,7 +332,7 @@ describe("AutoForm", () => {
           },
           required: ["name", "email"],
         }}
-      />
+      />,
     );
 
     await user.click(screen.getByRole("button", { name: "Submit" }));
@@ -342,11 +342,11 @@ describe("AutoForm", () => {
 
     expect(screen.getByLabelText(/name/i)).toHaveAttribute(
       "aria-invalid",
-      "true"
+      "true",
     );
     expect(screen.getByLabelText(/email/i)).toHaveAttribute(
       "aria-invalid",
-      "true"
+      "true",
     );
   });
 
@@ -366,7 +366,7 @@ describe("AutoForm", () => {
           className: "text-indigo-500",
           icon: <span data-testid="custom-validation-icon">!</span>,
         }}
-      />
+      />,
     );
 
     await user.click(screen.getByRole("button", { name: "Submit" }));

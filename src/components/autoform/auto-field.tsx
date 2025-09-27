@@ -28,7 +28,7 @@ import type { _JSONSchema } from "node_modules/zod/v4/core/json-schema.d.cts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
 const resolveSchema = (
-  schema: JsonProperty | _JSONSchema
+  schema: JsonProperty | _JSONSchema,
 ): JsonProperty | _JSONSchema => {
   if (
     typeof schema === "object" &&
@@ -44,7 +44,7 @@ const resolveSchema = (
 };
 
 const getDefaultValueForSchema = (
-  schema: JsonProperty | _JSONSchema
+  schema: JsonProperty | _JSONSchema,
 ): unknown => {
   if (typeof schema !== "object" || schema === null) {
     return null;
@@ -91,7 +91,7 @@ const ArrayField = ({
 }) => {
   const resolvedItemSchema = useMemo(
     () => resolveSchema(itemSchema),
-    [itemSchema]
+    [itemSchema],
   );
 
   const { control, getValues, setValue } = useFormContext<FieldValues>();
@@ -224,7 +224,7 @@ export const AutoField = ({
         rules={validationRules}
         render={({ field }) => {
           const selected = options.find((option) =>
-            Object.is(option.value, field.value)
+            Object.is(option.value, field.value),
           );
 
           return (
@@ -252,7 +252,7 @@ export const AutoField = ({
             </Select>
           );
         }}
-      />
+      />,
     );
   }
 
@@ -268,7 +268,7 @@ export const AutoField = ({
 
       if (!items) {
         return appendValidationMessage(
-          <span className="text-muted-foreground">[]</span>
+          <span className="text-muted-foreground">[]</span>,
         );
       }
 
@@ -278,7 +278,7 @@ export const AutoField = ({
             name={name}
             itemSchema={items[0] ?? {}}
             validationMessageProps={validationMessageProps}
-          />
+          />,
         );
       }
 
@@ -288,7 +288,7 @@ export const AutoField = ({
             name={name}
             itemSchema={{ type: "string" }}
             validationMessageProps={validationMessageProps}
-          />
+          />,
         );
       }
 
@@ -297,7 +297,7 @@ export const AutoField = ({
           name={name}
           itemSchema={items}
           validationMessageProps={validationMessageProps}
-        />
+        />,
       );
     }
 
@@ -310,7 +310,7 @@ export const AutoField = ({
         }
       ).properties;
       const requiredKeys = new Set(
-        (schema as { required?: string[] }).required ?? []
+        (schema as { required?: string[] }).required ?? [],
       );
 
       if (properties && Object.keys(properties).length > 0) {
@@ -333,22 +333,22 @@ export const AutoField = ({
                   required={requiredKeys.has(key)}
                   validationMessageProps={validationMessageProps}
                 />
-            </li>
-          ))}
-        </ul>
-      );
+              </li>
+            ))}
+          </ul>,
+        );
       }
 
       if ("additionalProperties" in schema) {
         return appendValidationMessage(
           <span className="text-muted-foreground">
             Record-style objects are not yet supported in AutoForm.
-          </span>
+          </span>,
         );
       }
 
       return appendValidationMessage(
-        <span className="text-muted-foreground">{`{ }`}</span>
+        <span className="text-muted-foreground">{`{ }`}</span>,
       );
     }
 
@@ -367,7 +367,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />
+            />,
           );
         case "uri":
           return appendValidationMessage(
@@ -378,7 +378,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />
+            />,
           );
         case "date-time":
           return appendValidationMessage(
@@ -389,7 +389,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />
+            />,
           );
         case "date":
           return appendValidationMessage(
@@ -400,7 +400,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />
+            />,
           );
         case "time":
           return appendValidationMessage(
@@ -412,7 +412,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />
+            />,
           );
         default:
           return appendValidationMessage(
@@ -423,7 +423,7 @@ export const AutoField = ({
               aria-invalid={invalid || undefined}
               aria-describedby={describedBy}
               {...register(fieldName, validationRules)}
-            />
+            />,
           );
       }
     }
@@ -441,7 +441,7 @@ export const AutoField = ({
             valueAsNumber: true,
             ...(validationRules ?? {}),
           })}
-        />
+        />,
       );
 
     case "boolean":
@@ -460,7 +460,7 @@ export const AutoField = ({
               onCheckedChange={(checked) => field.onChange(Boolean(checked))}
             />
           )}
-        />
+        />,
       );
 
     case "null":

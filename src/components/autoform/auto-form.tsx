@@ -59,7 +59,7 @@ export const AutoForm = ({
                   validationMessageProps={validationMessageProps}
                 />
               </li>
-            )
+            ),
           )}
         </ul>
 
