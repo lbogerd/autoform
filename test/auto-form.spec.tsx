@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { AutoForm } from "../src/components/autoform/auto-form";
 
@@ -51,9 +51,7 @@ describe("AutoForm $ref handling", () => {
     );
 
     expect(
-      screen.getByText(
-        'No type found: {"$ref":"#/$defs/Nope"}'
-      )
+      screen.getByText('No type found: {"$ref":"#/$defs/Nope"}')
     ).toBeInTheDocument();
   });
 });
