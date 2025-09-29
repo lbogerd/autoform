@@ -61,7 +61,7 @@ describe("New version tests", () => {
       ...newForm,
       fields: {
         ...newForm.fields,
-        age: { type: "string", default: 13 },
+        fail: { type: "string", default: 13 },
       },
     };
 
