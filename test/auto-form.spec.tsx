@@ -45,7 +45,7 @@ afterEach(() => {
   cleanup();
 });
 
-describe("HookAutoForm", () => {
+describe("AutoForm", () => {
   it("resolves $ref entries before rendering inputs", () => {
     const Email = z.email();
 

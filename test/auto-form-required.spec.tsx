@@ -26,14 +26,14 @@ afterEach(() => {
   cleanup();
 });
 
-describe("HookAutoForm required field marking", () => {
+describe("AutoForm required field marking", () => {
   it("marks top-level required fields with an asterisk and sets aria-required on inputs", () => {
     render(
       <AutoForm
         schema={z.object({
           name: z.string(),
           age: z.number().int().optional(),
-          website: z.string().url(),
+          website: z.url(),
         })}
       />
     );

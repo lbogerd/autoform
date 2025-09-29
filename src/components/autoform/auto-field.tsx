@@ -21,19 +21,16 @@ import type { _JSONSchema } from "node_modules/zod/v4/core/json-schema.d.cts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { AlertOctagonIcon } from "lucide-react";
 
-const ValidationErrorMessage = ({ messages }: { messages?: string[] }) => {
-  if (!messages || messages.length === 0) return null;
+const ValidationErrorMessage = ({ message }: { message?: string }) => {
+  if (!message) return null;
 
   return (
-    <div className="rounded-md bg-red-50 p-4">
+    <div
+      className="rounded-md bg-red-50 p-4 flex gap-2 mt-1 items-center"
+      data-testid="validation-error"
+    >
       <AlertOctagonIcon className="h-5 w-5 text-red-400" />
-      <ul>
-        {messages.map((msg, idx) => (
-          <li key={idx} className="text-sm text-red-700">
-            {msg}
-          </li>
-        ))}
-      </ul>
+      <p className="text-sm text-red-700">{message}</p>
     </div>
   );
 };
@@ -94,11 +91,11 @@ const getDefaultValueForSchema = (
 const ArrayField = ({
   name,
   itemSchema,
-  validationErrors,
+  validationError,
 }: {
   name: string;
   itemSchema: JsonProperty | _JSONSchema;
-  validationErrors?: string[];
+  validationError?: string;
 }) => {
   const resolvedItemSchema = useMemo(
     () => resolveSchema(itemSchema),
@@ -128,7 +125,7 @@ const ArrayField = ({
               <AutoField
                 name={`${name}.${index}`}
                 jsonProperty={resolvedItemSchema}
-                validationErrors={validationErrors}
+                validationError={validationError}
               />
             </div>
             <Button type="button" variant="ghost" onClick={() => remove(index)}>
@@ -153,13 +150,13 @@ export const AutoField = ({
   jsonProperty,
   required,
   inputId,
-  validationErrors,
+  validationError,
 }: {
   name: string;
   jsonProperty: JsonProperty | _JSONSchema;
   required?: boolean;
   inputId?: string;
-  validationErrors?: string[];
+  validationError?: string;
 }) => {
   const { control, register } = useFormContext<FieldValues>();
 
@@ -176,7 +173,7 @@ export const AutoField = ({
         parentName={name}
         options={jsonProperty.anyOf}
         required={required}
-        validationErrors={validationErrors}
+        validationError={validationError}
       />
     );
   }
@@ -232,7 +229,7 @@ export const AutoField = ({
                   ))}
                 </SelectContent>
               </Select>
-              <ValidationErrorMessage messages={validationErrors} />
+              <ValidationErrorMessage message={validationError} />
             </>
           );
         }}
@@ -259,7 +256,7 @@ export const AutoField = ({
           <ArrayField
             name={name}
             itemSchema={items[0] ?? {}}
-            validationErrors={validationErrors}
+            validationError={validationError}
           />
         );
       }
@@ -269,7 +266,7 @@ export const AutoField = ({
           <ArrayField
             name={name}
             itemSchema={{ type: "string" }}
-            validationErrors={validationErrors}
+            validationError={validationError}
           />
         );
       }
@@ -278,7 +275,7 @@ export const AutoField = ({
         <ArrayField
           name={name}
           itemSchema={items}
-          validationErrors={validationErrors}
+          validationError={validationError}
         />
       );
     }
@@ -313,7 +310,7 @@ export const AutoField = ({
                   name={`${name}.${key}`}
                   jsonProperty={value}
                   required={requiredKeys.has(key)}
-                  validationErrors={validationErrors}
+                  validationError={validationError}
                 />
               </li>
             ))}
@@ -347,7 +344,7 @@ export const AutoField = ({
                 aria-required={required}
                 {...register(name)}
               />
-              <ValidationErrorMessage messages={validationErrors} />
+              <ValidationErrorMessage message={validationError} />
             </>
           );
         case "uri":
@@ -359,7 +356,7 @@ export const AutoField = ({
                 aria-required={required}
                 {...register(name)}
               />
-              <ValidationErrorMessage messages={validationErrors} />
+              <ValidationErrorMessage message={validationError} />
             </>
           );
         case "date-time":
@@ -371,7 +368,7 @@ export const AutoField = ({
                 aria-required={required}
                 {...register(name)}
               />
-              <ValidationErrorMessage messages={validationErrors} />
+              <ValidationErrorMessage message={validationError} />
             </>
           );
         case "date":
@@ -383,7 +380,7 @@ export const AutoField = ({
                 aria-required={required}
                 {...register(name)}
               />
-              <ValidationErrorMessage messages={validationErrors} />
+              <ValidationErrorMessage message={validationError} />
             </>
           );
         case "time":
@@ -396,7 +393,7 @@ export const AutoField = ({
                 aria-required={required}
                 {...register(name)}
               />
-              <ValidationErrorMessage messages={validationErrors} />
+              <ValidationErrorMessage message={validationError} />
             </>
           );
         default:
@@ -408,7 +405,7 @@ export const AutoField = ({
                 aria-required={required}
                 {...register(name)}
               />
-              <ValidationErrorMessage messages={validationErrors} />
+              <ValidationErrorMessage message={validationError} />
             </>
           );
       }
@@ -424,7 +421,7 @@ export const AutoField = ({
             aria-required={required}
             {...register(name, { valueAsNumber: true })}
           />
-          <ValidationErrorMessage messages={validationErrors} />
+          <ValidationErrorMessage message={validationError} />
         </>
       );
 
@@ -441,7 +438,7 @@ export const AutoField = ({
                 aria-required={required}
                 onCheckedChange={(checked) => field.onChange(Boolean(checked))}
               />
-              <ValidationErrorMessage messages={validationErrors} />
+              <ValidationErrorMessage message={validationError} />
             </>
           )}
         />
@@ -459,12 +456,12 @@ function AnyOfTabs({
   parentName,
   options,
   required,
-  validationErrors,
+  validationError,
 }: {
   parentName: string;
   options: Array<JsonProperty | _JSONSchema>;
   required?: boolean;
-  validationErrors?: string[];
+  validationError?: string;
 }) {
   const [active, setActive] = useState("0");
   const { setValue, getValues } = useFormContext<FieldValues>();
@@ -515,7 +512,7 @@ function AnyOfTabs({
             jsonProperty={opt}
             required={required}
             inputId={parentName}
-            validationErrors={validationErrors}
+            validationError={validationError}
           />
         </TabsContent>
       ))}

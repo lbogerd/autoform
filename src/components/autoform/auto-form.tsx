@@ -1,5 +1,10 @@
 import { useState } from "react";
-import { FormProvider, useForm, type FieldValues } from "react-hook-form";
+import {
+  FormProvider,
+  useForm,
+  type FieldErrors,
+  type FieldValues,
+} from "react-hook-form";
 
 import { Button } from "../ui/button";
 import { AutoField } from "./auto-field";
@@ -18,13 +23,14 @@ export const AutoForm = ({
   defaultValues,
   onSubmit,
 }: AutoFormProps) => {
-  const schemaAsJson = z.toJSONSchema(schema);
-
-  const resolvedSchema = replaceRefs(schemaAsJson);
   const form = useForm<FieldValues>({
     resolver: zodResolver(schema),
     defaultValues,
   });
+
+  const schemaAsJson = z.toJSONSchema(schema);
+  const resolvedSchema = replaceRefs(schemaAsJson);
+
   const [lastSubmittedValues, setLastSubmittedValues] =
     useState<FieldValues | null>(null);
 
@@ -36,6 +42,7 @@ export const AutoForm = ({
 
   const currentValues = form.watch();
   const requiredFields = new Set(resolvedSchema.required ?? []);
+  const serializedErrors = safeJson(form.formState.errors);
 
   return (
     <FormProvider {...form}>
@@ -54,6 +61,9 @@ export const AutoForm = ({
                   name={key}
                   jsonProperty={value}
                   required={requiredFields.has(key)}
+                  validationError={
+                    form.formState.errors[key]?.message as string
+                  }
                 />
               </li>
             )
@@ -65,6 +75,13 @@ export const AutoForm = ({
           <Button type="button" variant="outline" onClick={() => form.reset()}>
             Reset
           </Button>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold">Validation Errors</h3>
+          <pre className="max-h-64 overflow-auto rounded-md bg-muted p-4 text-xs">
+            {serializedErrors}
+          </pre>
         </div>
 
         <div className="space-y-4">
@@ -87,6 +104,61 @@ export const AutoForm = ({
     </FormProvider>
   );
 };
+
+function safeJson(errors: FieldErrors<FieldValues>, space = 2): string {
+  try {
+    const serializable = toSerializable(errors);
+    const result = JSON.stringify(serializable, null, space);
+    return result ?? "null";
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : String(error ?? "Unknown error");
+    return `"Serialization failed: ${message}"`;
+  }
+}
+
+function toSerializable(
+  value: unknown,
+  seen: WeakSet<object> = new WeakSet<object>()
+): unknown {
+  if (value === null) return null;
+
+  if (typeof value === "function") {
+    return value.name ? `[Function ${value.name}]` : "[Function]";
+  }
+
+  if (typeof value !== "object") {
+    return value;
+  }
+
+  const objectValue = value as Record<string, unknown>;
+
+  if (seen.has(objectValue)) {
+    return "[Circular]";
+  }
+  seen.add(objectValue);
+
+  if (Array.isArray(value)) {
+    return value.map((item) => toSerializable(item, seen));
+  }
+
+  const result: Record<string, unknown> = {};
+
+  for (const [key, val] of Object.entries(objectValue)) {
+    if (key === "ref") continue;
+
+    if (key === "_f" && val && typeof val === "object") {
+      const withoutRef = { ...(val as Record<string, unknown>) };
+      delete withoutRef.ref;
+      result[key] = toSerializable(withoutRef, seen);
+      continue;
+    }
+
+    result[key] = toSerializable(val, seen);
+  }
+
+  return result;
+}
 
 function normalizeAnyOfValues(values: unknown): unknown {
   if (values == null || typeof values !== "object") return values;
