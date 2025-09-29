@@ -61,7 +61,7 @@ import { z } from "zod";
 const User = z.object({
   name: z.string().min(1),
   email: z.email(),
-  website: z.string().url().optional(),
+  website: z.url().optional(),
   tags: z.array(z.string()).min(1),
   role: z.enum(["admin", "editor", "viewer"]),
 });

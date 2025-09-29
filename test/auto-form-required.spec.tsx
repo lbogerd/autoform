@@ -3,7 +3,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { HookAutoForm } from "../src/components/autoform/hook-auto-form";
+import { AutoForm } from "../src/components/autoform/auto-form";
+import { z } from "zod";
 
 beforeAll(() => {
   class MockResizeObserver {
@@ -28,16 +29,12 @@ afterEach(() => {
 describe("HookAutoForm required field marking", () => {
   it("marks top-level required fields with an asterisk and sets aria-required on inputs", () => {
     render(
-      <HookAutoForm
-        schema={{
-          type: "object",
-          properties: {
-            name: { type: "string" },
-            age: { type: "integer" },
-            website: { type: "string", format: "uri" },
-          },
-          required: ["name", "website"],
-        }}
+      <AutoForm
+        schema={z.object({
+          name: z.string(),
+          age: z.number().int().optional(),
+          website: z.string().url(),
+        })}
       />
     );
 
@@ -59,21 +56,13 @@ describe("HookAutoForm required field marking", () => {
 
   it("marks nested required object fields and propagates aria-required", async () => {
     render(
-      <HookAutoForm
-        schema={{
-          type: "object",
-          properties: {
-            person: {
-              type: "object",
-              properties: {
-                firstName: { type: "string" },
-                lastName: { type: "string" },
-              },
-              required: ["firstName"],
-            },
-          },
-          required: ["person"],
-        }}
+      <AutoForm
+        schema={z.object({
+          person: z.object({
+            firstName: z.string(),
+            lastName: z.string().optional(),
+          }),
+        })}
       />
     );
 
@@ -102,14 +91,10 @@ describe("HookAutoForm required field marking", () => {
   it("marks required array fields at the property label", async () => {
     const user = userEvent.setup();
     render(
-      <HookAutoForm
-        schema={{
-          type: "object",
-          properties: {
-            tags: { type: "array", items: { type: "string" } },
-          },
-          required: ["tags"],
-        }}
+      <AutoForm
+        schema={z.object({
+          tags: z.array(z.string()),
+        })}
       />
     );
 
@@ -124,15 +109,11 @@ describe("HookAutoForm required field marking", () => {
 
   it("adds aria-required to selects and checkboxes when required", async () => {
     render(
-      <HookAutoForm
-        schema={{
-          type: "object",
-          properties: {
-            role: { type: "string", enum: ["admin", "user"] },
-            agree: { type: "boolean" },
-          },
-          required: ["role", "agree"],
-        }}
+      <AutoForm
+        schema={z.object({
+          role: z.enum(["admin", "user"]),
+          agree: z.boolean(),
+        })}
       />
     );
 

@@ -4,10 +4,11 @@ import { FormProvider, useForm, type FieldValues } from "react-hook-form";
 import { Button } from "../ui/button";
 import { AutoField } from "./auto-field";
 import { replaceRefs } from "../../lib/autoform/refs";
-import type { JsonSchema } from "./types";
+import { z, type ZodObject } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 export type AutoFormProps = {
-  schema: JsonSchema;
+  schema: ZodObject;
   defaultValues?: FieldValues;
   onSubmit?: (values: FieldValues) => void;
 };
@@ -17,8 +18,11 @@ export const AutoForm = ({
   defaultValues,
   onSubmit,
 }: AutoFormProps) => {
-  const resolvedSchema = replaceRefs(schema);
+  const schemaAsJson = z.toJSONSchema(schema);
+
+  const resolvedSchema = replaceRefs(schemaAsJson);
   const form = useForm<FieldValues>({
+    resolver: zodResolver(schema),
     defaultValues,
   });
   const [lastSubmittedValues, setLastSubmittedValues] =
