@@ -52,13 +52,21 @@ interface UnionField extends BaseField {
   default?: unknown;
 }
 
+interface RecordField extends BaseField {
+  type: "record";
+  keyType: "string" | "number";
+  valueType: Field;
+  default?: Record<string | number, unknown>;
+}
+
 type Field =
   | StringField
   | NumberField
   | BooleanField
   | ArrayField
   | UnionField
-  | ObjectField;
+  | ObjectField
+  | RecordField;
 
 export const ObjectFieldSchema = BaseFieldSchema.extend({
   type: z.literal("object"),
@@ -83,6 +91,13 @@ export const UnionFieldSchema = BaseFieldSchema.extend({
   default: z.any().optional(),
 }) satisfies z.ZodType<UnionField>;
 
+export const RecordFieldSchema = BaseFieldSchema.extend({
+  type: z.literal("record"),
+  keyType: z.union([z.literal("string"), z.literal("number")]),
+  valueType: z.lazy(() => FieldSchema),
+  default: z.record(z.union([z.string(), z.number()]), z.any()).optional(),
+}) satisfies z.ZodType<RecordField>;
+
 export const FieldSchema: z.ZodType<Field> = z.union([
   StringFieldSchema,
   NumberFieldSchema,
@@ -90,6 +105,7 @@ export const FieldSchema: z.ZodType<Field> = z.union([
   ObjectFieldSchema,
   ArrayFieldSchema,
   UnionFieldSchema,
+  RecordFieldSchema,
 ]);
 
 export const FormSchema = z.object({
@@ -97,43 +113,3 @@ export const FormSchema = z.object({
   description: z.string().optional(),
   fields: z.record(z.string(), FieldSchema),
 });
-
-const newForm = {
-  title: "Example Form",
-  description: "This is an example form schema",
-  fields: {
-    name: {
-      type: "string",
-      required: true,
-    },
-    age: {
-      type: "number",
-      default: 13,
-    },
-    isStudent: {
-      type: "boolean",
-    },
-    address: {
-      type: "object",
-      properties: {
-        street: { type: "string", required: true },
-        city: { type: "string", required: true },
-        zipCode: { type: "string" },
-      },
-      required: true,
-    },
-    nullableField: {
-      type: "string",
-      nullable: true,
-    },
-    role: {
-      type: "string",
-      enum: ["admin", "user", "guest"],
-      default: "user",
-    },
-    tags: {
-      type: "array",
-      itemType: { type: "string" },
-    },
-  },
-} satisfies z.infer<typeof FormSchema>;
