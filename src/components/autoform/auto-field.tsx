@@ -19,6 +19,24 @@ import {
 import type { JsonProperty } from "./types";
 import type { _JSONSchema } from "node_modules/zod/v4/core/json-schema.d.cts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { AlertOctagonIcon } from "lucide-react";
+
+const ValidationErrorMessage = ({ messages }: { messages?: string[] }) => {
+  if (!messages || messages.length === 0) return null;
+
+  return (
+    <div className="rounded-md bg-red-50 p-4">
+      <AlertOctagonIcon className="h-5 w-5 text-red-400" />
+      <ul>
+        {messages.map((msg, idx) => (
+          <li key={idx} className="text-sm text-red-700">
+            {msg}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
 
 const resolveSchema = (
   schema: JsonProperty | _JSONSchema
@@ -76,9 +94,11 @@ const getDefaultValueForSchema = (
 const ArrayField = ({
   name,
   itemSchema,
+  validationErrors,
 }: {
   name: string;
   itemSchema: JsonProperty | _JSONSchema;
+  validationErrors?: string[];
 }) => {
   const resolvedItemSchema = useMemo(
     () => resolveSchema(itemSchema),
@@ -108,6 +128,7 @@ const ArrayField = ({
               <AutoField
                 name={`${name}.${index}`}
                 jsonProperty={resolvedItemSchema}
+                validationErrors={validationErrors}
               />
             </div>
             <Button type="button" variant="ghost" onClick={() => remove(index)}>
@@ -132,11 +153,13 @@ export const AutoField = ({
   jsonProperty,
   required,
   inputId,
+  validationErrors,
 }: {
   name: string;
   jsonProperty: JsonProperty | _JSONSchema;
   required?: boolean;
   inputId?: string;
+  validationErrors?: string[];
 }) => {
   const { control, register } = useFormContext<FieldValues>();
 
@@ -153,6 +176,7 @@ export const AutoField = ({
         parentName={name}
         options={jsonProperty.anyOf}
         required={required}
+        validationErrors={validationErrors}
       />
     );
   }
@@ -189,24 +213,27 @@ export const AutoField = ({
           );
 
           return (
-            <Select
-              value={selected?.key ?? ""}
-              onValueChange={(value) => {
-                const match = options.find((option) => option.key === value);
-                field.onChange(match?.value ?? value);
-              }}
-            >
-              <SelectTrigger aria-required={required}>
-                <SelectValue placeholder="Select value..." />
-              </SelectTrigger>
-              <SelectContent>
-                {options.map((option) => (
-                  <SelectItem key={option.key} value={option.key}>
-                    {String(option.value)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <>
+              <Select
+                value={selected?.key ?? ""}
+                onValueChange={(value) => {
+                  const match = options.find((option) => option.key === value);
+                  field.onChange(match?.value ?? value);
+                }}
+              >
+                <SelectTrigger aria-required={required}>
+                  <SelectValue placeholder="Select value..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {options.map((option) => (
+                    <SelectItem key={option.key} value={option.key}>
+                      {String(option.value)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <ValidationErrorMessage messages={validationErrors} />
+            </>
           );
         }}
       />
@@ -228,14 +255,32 @@ export const AutoField = ({
       }
 
       if (Array.isArray(items)) {
-        return <ArrayField name={name} itemSchema={items[0] ?? {}} />;
+        return (
+          <ArrayField
+            name={name}
+            itemSchema={items[0] ?? {}}
+            validationErrors={validationErrors}
+          />
+        );
       }
 
       if (items === true) {
-        return <ArrayField name={name} itemSchema={{ type: "string" }} />;
+        return (
+          <ArrayField
+            name={name}
+            itemSchema={{ type: "string" }}
+            validationErrors={validationErrors}
+          />
+        );
       }
 
-      return <ArrayField name={name} itemSchema={items} />;
+      return (
+        <ArrayField
+          name={name}
+          itemSchema={items}
+          validationErrors={validationErrors}
+        />
+      );
     }
 
     case "object": {
@@ -268,6 +313,7 @@ export const AutoField = ({
                   name={`${name}.${key}`}
                   jsonProperty={value}
                   required={requiredKeys.has(key)}
+                  validationErrors={validationErrors}
                 />
               </li>
             ))}
@@ -294,58 +340,76 @@ export const AutoField = ({
       switch (format) {
         case "email":
           return (
-            <Input
-              id={inputId ?? name}
-              type="email"
-              aria-required={required}
-              {...register(name)}
-            />
+            <>
+              <Input
+                id={inputId ?? name}
+                type="email"
+                aria-required={required}
+                {...register(name)}
+              />
+              <ValidationErrorMessage messages={validationErrors} />
+            </>
           );
         case "uri":
           return (
-            <Input
-              id={inputId ?? name}
-              type="url"
-              aria-required={required}
-              {...register(name)}
-            />
+            <>
+              <Input
+                id={inputId ?? name}
+                type="url"
+                aria-required={required}
+                {...register(name)}
+              />
+              <ValidationErrorMessage messages={validationErrors} />
+            </>
           );
         case "date-time":
           return (
-            <Input
-              id={inputId ?? name}
-              type="datetime-local"
-              aria-required={required}
-              {...register(name)}
-            />
+            <>
+              <Input
+                id={inputId ?? name}
+                type="datetime-local"
+                aria-required={required}
+                {...register(name)}
+              />
+              <ValidationErrorMessage messages={validationErrors} />
+            </>
           );
         case "date":
           return (
-            <Input
-              id={inputId ?? name}
-              type="date"
-              aria-required={required}
-              {...register(name)}
-            />
+            <>
+              <Input
+                id={inputId ?? name}
+                type="date"
+                aria-required={required}
+                {...register(name)}
+              />
+              <ValidationErrorMessage messages={validationErrors} />
+            </>
           );
         case "time":
           return (
-            <Input
-              id={inputId ?? name}
-              type="time"
-              step={1}
-              aria-required={required}
-              {...register(name)}
-            />
+            <>
+              <Input
+                id={inputId ?? name}
+                type="time"
+                step={1}
+                aria-required={required}
+                {...register(name)}
+              />
+              <ValidationErrorMessage messages={validationErrors} />
+            </>
           );
         default:
           return (
-            <Input
-              id={inputId ?? name}
-              type="text"
-              aria-required={required}
-              {...register(name)}
-            />
+            <>
+              <Input
+                id={inputId ?? name}
+                type="text"
+                aria-required={required}
+                {...register(name)}
+              />
+              <ValidationErrorMessage messages={validationErrors} />
+            </>
           );
       }
     }
@@ -353,12 +417,15 @@ export const AutoField = ({
     case "number":
     case "integer":
       return (
-        <Input
-          id={inputId ?? name}
-          type="number"
-          aria-required={required}
-          {...register(name, { valueAsNumber: true })}
-        />
+        <>
+          <Input
+            id={inputId ?? name}
+            type="number"
+            aria-required={required}
+            {...register(name, { valueAsNumber: true })}
+          />
+          <ValidationErrorMessage messages={validationErrors} />
+        </>
       );
 
     case "boolean":
@@ -367,12 +434,15 @@ export const AutoField = ({
           control={control}
           name={name}
           render={({ field }) => (
-            <Checkbox
-              id={inputId ?? name}
-              checked={Boolean(field.value)}
-              aria-required={required}
-              onCheckedChange={(checked) => field.onChange(Boolean(checked))}
-            />
+            <>
+              <Checkbox
+                id={inputId ?? name}
+                checked={Boolean(field.value)}
+                aria-required={required}
+                onCheckedChange={(checked) => field.onChange(Boolean(checked))}
+              />
+              <ValidationErrorMessage messages={validationErrors} />
+            </>
           )}
         />
       );
@@ -389,10 +459,12 @@ function AnyOfTabs({
   parentName,
   options,
   required,
+  validationErrors,
 }: {
   parentName: string;
   options: Array<JsonProperty | _JSONSchema>;
   required?: boolean;
+  validationErrors?: string[];
 }) {
   const [active, setActive] = useState("0");
   const { setValue, getValues } = useFormContext<FieldValues>();
@@ -443,6 +515,7 @@ function AnyOfTabs({
             jsonProperty={opt}
             required={required}
             inputId={parentName}
+            validationErrors={validationErrors}
           />
         </TabsContent>
       ))}
