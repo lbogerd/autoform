@@ -86,7 +86,7 @@ const deeplyNestedForm = {
   },
 } satisfies z.infer<typeof FormSchema>;
 
-describe("New version tests", () => {
+describe("Basic schema tests", () => {
   it("should be parsed correctly", () => {
     expect(FormSchema.safeParse(newForm).success).toBe(true);
   });
@@ -113,9 +113,9 @@ describe("New version tests", () => {
       ...deeplyNestedForm,
     };
 
-    (
-      invalidDeeplyNestedForm as any
-    ).fields.level1.properties.level2.properties.level3.type = "asdfasdfasdf";
+    // @ts-expect-error - intentionally incorrect
+    invalidDeeplyNestedForm.fields.level1.properties.level2.properties.level3.type =
+      "asdfasdfasdf";
 
     expect(FormSchema.safeParse(invalidDeeplyNestedForm).success).toBe(false);
   });
