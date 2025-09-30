@@ -4,7 +4,17 @@ import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { FieldSchema, FormSchema } from "./schemas";
+import {
+  ArrayFieldSchema,
+  FieldSchema,
+  FormSchema,
+  UnionFieldSchema,
+  RecordFieldSchema,
+} from "./schemas";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+
+// Helper type for record fields
+type RecordFieldType = z.infer<typeof RecordFieldSchema>;
 
 export const AutoForm = ({
   schema,
@@ -98,10 +108,16 @@ export const AutoField = ({
       );
 
     case "array":
-      return <ArrayFieldRenderer field={field} />;
+      return <ArrayField field={field} />;
+
+    case "union":
+      return <UnionField field={field} />;
+
+    case "record":
+      return <RecordField field={field} />;
 
     default:
-      return <div>Unsupported field type: {field.type}</div>;
+      return null;
   }
 };
 
@@ -132,9 +148,7 @@ const LabelWithRequired = ({
 const RequiredIndicator = ({ required }: { required: boolean }) =>
   required ? <span className="text-red-500">*</span> : null;
 
-type ArrayField = Extract<z.infer<typeof FieldSchema>, { type: "array" }>;
-
-const ArrayFieldRenderer = ({ field }: { field: ArrayField }) => {
+const ArrayField = ({ field }: { field: z.infer<typeof ArrayFieldSchema> }) => {
   const [items, setItems] = useState<
     Array<{ id: number; defaultValue: unknown }>
   >(() =>
@@ -201,6 +215,123 @@ const ArrayFieldRenderer = ({ field }: { field: ArrayField }) => {
 
       <Button type="button" variant={"outline"} onClick={addItem}>
         Add item
+      </Button>
+    </WithErrorMessage>
+  );
+};
+
+const UnionField = ({ field }: { field: z.infer<typeof UnionFieldSchema> }) => {
+  return (
+    <WithErrorMessage errorMessage={field.errorMessage}>
+      <Tabs defaultValue={field.anyOf[0]?.title}>
+        <TabsList>
+          {field.anyOf.map((option) => (
+            <TabsTrigger key={option.title} value={option.title}>
+              {option.title}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        <div className="mt-4">
+          {field.anyOf.map((option) => (
+            <TabsContent key={option.title} value={option.title}>
+              <AutoField field={option} />
+            </TabsContent>
+          ))}
+        </div>
+      </Tabs>
+    </WithErrorMessage>
+  );
+};
+
+const RecordField = ({ field }: { field: RecordFieldType }) => {
+  const [keyValuePairs, setKeyValuePairs] = useState<
+    Array<{ id: number; key: string; value: unknown }>
+  >(() =>
+    Object.entries(field.default || {}).map(([key, value], index) => ({
+      id: index,
+      key,
+      value,
+    }))
+  );
+
+  const addKeyValuePair = () => {
+    setKeyValuePairs((prev) => {
+      const nextId = prev.reduce((max, pair) => Math.max(max, pair.id), -1) + 1;
+      return [
+        ...prev,
+        {
+          id: nextId,
+          key: "",
+          value: (field.valueType as { default?: unknown }).default,
+        },
+      ];
+    });
+  };
+
+  const removeKeyValuePair = (id: number) => {
+    setKeyValuePairs((prev) => prev.filter((pair) => pair.id !== id));
+  };
+
+  return (
+    <WithErrorMessage errorMessage={field.errorMessage}>
+      <LabelWithRequired
+        htmlFor={field.title}
+        required={field.required || false}
+      >
+        {field.title}
+      </LabelWithRequired>
+
+      <div className="flex flex-col gap-1">
+        {keyValuePairs.map((pair) => {
+          const valueField = {
+            ...field.valueType,
+            default:
+              pair.value ?? (field.valueType as { default?: unknown }).default,
+          } as z.infer<typeof FieldSchema>;
+
+          return (
+            <div key={pair.id} className="flex gap-2">
+              <div className="flex-1">
+                <Input
+                  type={field.keyType === "number" ? "number" : "text"}
+                  value={pair.key}
+                  onChange={(e) =>
+                    setKeyValuePairs((prev) =>
+                      prev.map((p) =>
+                        p.id === pair.id ? { ...p, key: e.target.value } : p
+                      )
+                    )
+                  }
+                  placeholder={
+                    field.keyType === "number" ? "Numeric key" : "Key"
+                  }
+                />
+              </div>
+              <div className="flex-1">
+                <AutoField field={valueField} showTitle={false} />
+              </div>
+              <Button
+                type="button"
+                onClick={() => removeKeyValuePair(pair.id)}
+                variant={"ghost"}
+                className="mt-auto hover:bg-destructive/90 hover:text-white focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60"
+              >
+                Remove
+              </Button>
+            </div>
+          );
+        })}
+
+        {keyValuePairs.length === 0 && (
+          <span className="text-sm text-muted-foreground">
+            No entries yet. Use "Add entry" to create one.
+          </span>
+        )}
+      </div>
+
+      <Button type="button" variant={"outline"} onClick={addKeyValuePair}>
+        Add entry
       </Button>
     </WithErrorMessage>
   );

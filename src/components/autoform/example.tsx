@@ -72,6 +72,38 @@ export const Example = () => {
                   title: "Hobby",
                 },
               },
+              contactMethod: {
+                type: "union",
+                title: "Preferred Contact Method",
+                description: "Select your preferred contact method",
+                anyOf: [
+                  {
+                    type: "string",
+                    title: "Email",
+                  },
+                  {
+                    type: "object",
+                    title: "Phone",
+                    properties: {
+                      phoneNumber: {
+                        type: "string",
+                        title: "Phone Number",
+                        required: true,
+                      },
+                    },
+                  },
+                ],
+              },
+              metadata: {
+                type: "record",
+                title: "Metadata",
+                description: "Key-value pairs for additional info",
+                keyType: "string",
+                valueType: {
+                  type: "string",
+                  title: "Value",
+                },
+              },
             },
           }}
         />
