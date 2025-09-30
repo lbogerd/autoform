@@ -15,7 +15,7 @@ export const AutoForm = ({
     <form>
       {schema.title && <h1>{schema.title}</h1>}
       {schema.description && <p>{schema.description}</p>}
-      <div>
+      <div className="flex flex-col gap-4">
         {Object.entries(schema.fields).map(([key, field]) => (
           <AutoField key={key} field={field} />
         ))}
@@ -62,19 +62,24 @@ export const AutoField = ({
 
     case "boolean":
       return (
-        <WithErrorMessage errorMessage={field.errorMessage}>
-          <LabelWithRequired
-            htmlFor={field.title}
-            required={field.required || false}
-          >
-            {field.title}
-          </LabelWithRequired>
-          <Checkbox
-            defaultChecked={field.default as boolean}
-            required={field.required}
-            id={field.title}
-          />
-        </WithErrorMessage>
+        <div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              defaultChecked={field.default as boolean}
+              required={field.required}
+              id={field.title}
+            />
+            <LabelWithRequired
+              htmlFor={field.title}
+              required={field.required || false}
+            >
+              {field.title}
+            </LabelWithRequired>
+          </div>
+          {field.errorMessage && (
+            <span className="text-red-500">{field.errorMessage}</span>
+          )}
+        </div>
       );
 
     case "object":
@@ -85,7 +90,7 @@ export const AutoField = ({
             {field.required && <RequiredIndicator required={field.required} />}
           </h2>
           {Object.entries(field.properties).map(([key, subField]) => (
-            <div key={key} className="mb-4">
+            <div key={key} className="mb-1.5">
               <AutoField field={subField} />
             </div>
           ))}
@@ -107,7 +112,7 @@ const WithErrorMessage = ({
   children: React.ReactNode;
   errorMessage: z.infer<typeof FieldSchema>["errorMessage"];
 }) => (
-  <div className="flex flex-col gap-1">
+  <div className="flex flex-col gap-1.5">
     {children}
     {errorMessage && <span className="text-red-500">{errorMessage}</span>}
   </div>
@@ -161,7 +166,7 @@ const ArrayFieldRenderer = ({ field }: { field: ArrayField }) => {
         {field.title}
       </LabelWithRequired>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
         {items.map((item) => {
           const itemField = {
             ...field.itemType,
@@ -178,8 +183,8 @@ const ArrayFieldRenderer = ({ field }: { field: ArrayField }) => {
               <Button
                 type="button"
                 onClick={() => removeItem(item.id)}
-                variant={"destructive"}
-                className="mt-auto"
+                variant={"ghost"}
+                className="mt-auto hover:bg-destructive/90 hover:text-white focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60"
               >
                 Remove
               </Button>
@@ -194,7 +199,7 @@ const ArrayFieldRenderer = ({ field }: { field: ArrayField }) => {
         )}
       </div>
 
-      <Button type="button" onClick={addItem}>
+      <Button type="button" variant={"outline"} onClick={addItem}>
         Add item
       </Button>
     </WithErrorMessage>
