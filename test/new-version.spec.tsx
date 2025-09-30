@@ -51,6 +51,41 @@ const newForm = {
   },
 } satisfies z.infer<typeof FormSchema>;
 
+const deeplyNestedForm = {
+  title: "Deeply Nested Form",
+  description: "A form with deeply nested structures",
+  fields: {
+    level1: {
+      type: "object",
+      properties: {
+        level2: {
+          type: "object",
+          properties: {
+            level3: {
+              type: "array",
+              itemType: {
+                type: "object",
+                properties: {
+                  name: { type: "string", required: true },
+                  details: {
+                    type: "object",
+                    properties: {
+                      age: { type: "number" },
+                      isActive: { type: "boolean", default: false },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          required: true,
+        },
+      },
+      required: true,
+    },
+  },
+} satisfies z.infer<typeof FormSchema>;
+
 describe("New version tests", () => {
   it("should be parsed correctly", () => {
     expect(FormSchema.safeParse(newForm).success).toBe(true);
@@ -67,5 +102,21 @@ describe("New version tests", () => {
 
     const parseResult = FormSchema.safeParse(invalidForm);
     expect(parseResult.success).toBe(false);
+  });
+
+  it("should parse deeply nested forms correctly", () => {
+    expect(FormSchema.safeParse(deeplyNestedForm).success).toBe(true);
+  });
+
+  it("should fail parsing deeply nested forms with errors", () => {
+    const invalidDeeplyNestedForm = {
+      ...deeplyNestedForm,
+    };
+
+    (
+      invalidDeeplyNestedForm as any
+    ).fields.level1.properties.level2.properties.level3.type = "asdfasdfasdf";
+
+    expect(FormSchema.safeParse(invalidDeeplyNestedForm).success).toBe(false);
   });
 });
