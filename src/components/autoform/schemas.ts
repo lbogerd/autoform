@@ -1,7 +1,7 @@
 import * as z from "zod";
 
 export const BaseFieldSchema = z.object({
-  title: z.string().optional(),
+  title: z.string(),
   description: z.string().optional(),
   errorMessage: z.string().optional(),
   required: z.boolean().default(false).optional(),

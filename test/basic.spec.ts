@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import z from "zod";
-import { FormSchema } from "../src/components/autoform/test";
+import { FormSchema } from "../src/components/autoform/schemas";
 
 const newForm = {
   title: "Example Form",

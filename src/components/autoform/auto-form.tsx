@@ -1,194 +1,202 @@
 import { useState } from "react";
-import {
-  FormProvider,
-  useForm,
-  type FieldErrors,
-  type FieldValues,
-} from "react-hook-form";
-
+import * as z from "zod";
 import { Button } from "../ui/button";
-import { AutoField } from "./auto-field";
-import { replaceRefs } from "../../lib/autoform/refs";
-import { z, type ZodObject } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-
-export type AutoFormProps = {
-  schema: ZodObject;
-  defaultValues?: FieldValues;
-  onSubmit?: (values: FieldValues) => void;
-};
+import { Checkbox } from "../ui/checkbox";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { FieldSchema, FormSchema } from "./schemas";
 
 export const AutoForm = ({
   schema,
-  defaultValues,
-  onSubmit,
-}: AutoFormProps) => {
-  const form = useForm<FieldValues>({
-    resolver: zodResolver(schema),
-    defaultValues,
-  });
-
-  const schemaAsJson = z.toJSONSchema(schema);
-  const resolvedSchema = replaceRefs(schemaAsJson);
-
-  const [lastSubmittedValues, setLastSubmittedValues] =
-    useState<FieldValues | null>(null);
-
-  const handleSubmit = form.handleSubmit((values) => {
-    const normalized = normalizeAnyOfValues(values) as FieldValues;
-    setLastSubmittedValues(normalized);
-    onSubmit?.(normalized);
-  });
-
-  const currentValues = form.watch();
-  const requiredFields = new Set(resolvedSchema.required ?? []);
-  const serializedErrors = safeJson(form.formState.errors);
-
+}: {
+  schema: z.infer<typeof FormSchema>;
+}) => {
   return (
-    <FormProvider {...form}>
-      <form className="space-y-6" onSubmit={handleSubmit} noValidate>
-        <ul className="space-y-4">
-          {Object.entries(resolvedSchema.properties ?? {}).map(
-            ([key, value]) => (
-              <li key={key} className="space-y-2">
-                <label className="text-sm font-medium" htmlFor={key}>
-                  {key}
-                  {requiredFields.has(key) ? (
-                    <span className="text-destructive ml-1">*</span>
-                  ) : null}
-                </label>
-                <AutoField
-                  name={key}
-                  jsonProperty={value}
-                  required={requiredFields.has(key)}
-                  validationError={
-                    form.formState.errors[key]?.message as string
-                  }
-                />
-              </li>
-            )
-          )}
-        </ul>
-
-        <div className="flex items-center gap-3">
-          <Button type="submit">Submit</Button>
-          <Button type="button" variant="outline" onClick={() => form.reset()}>
-            Reset
-          </Button>
-        </div>
-
-        <div>
-          <h3 className="text-sm font-semibold">Validation Errors</h3>
-          <pre className="max-h-64 overflow-auto rounded-md bg-muted p-4 text-xs">
-            {serializedErrors}
-          </pre>
-        </div>
-
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold">Live values</h3>
-            <pre className="max-h-64 overflow-auto rounded-md bg-muted p-4 text-xs">
-              {JSON.stringify(currentValues, null, 2)}
-            </pre>
-          </div>
-          {lastSubmittedValues ? (
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Last submitted values</h3>
-              <pre className="max-h-64 overflow-auto rounded-md bg-muted p-4 text-xs">
-                {JSON.stringify(lastSubmittedValues, null, 2)}
-              </pre>
-            </div>
-          ) : null}
-        </div>
-      </form>
-    </FormProvider>
+    <form>
+      {schema.title && <h1>{schema.title}</h1>}
+      {schema.description && <p>{schema.description}</p>}
+      <div>
+        {Object.entries(schema.fields).map(([key, field]) => (
+          <AutoField key={key} field={field} />
+        ))}
+      </div>
+    </form>
   );
 };
 
-function safeJson(errors: FieldErrors<FieldValues>, space = 2): string {
-  try {
-    const serializable = toSerializable(errors);
-    const result = JSON.stringify(serializable, null, space);
-    return result ?? "null";
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : String(error ?? "Unknown error");
-    return `"Serialization failed: ${message}"`;
+export const AutoField = ({
+  field,
+  showTitle = true,
+}: {
+  field: z.infer<typeof FieldSchema>;
+  showTitle?: boolean;
+}) => {
+  switch (field.type) {
+    case "string":
+      return (
+        <WithErrorMessage errorMessage={field.errorMessage}>
+          {showTitle && (
+            <LabelWithRequired
+              htmlFor={field.title}
+              required={field.required || false}
+            >
+              {field.title}
+            </LabelWithRequired>
+          )}
+          <Input type="text" required={field.required} id={field.title} />
+        </WithErrorMessage>
+      );
+
+    case "number":
+      return (
+        <WithErrorMessage errorMessage={field.errorMessage}>
+          <LabelWithRequired
+            htmlFor={field.title}
+            required={field.required || false}
+          >
+            {field.title}
+          </LabelWithRequired>
+          <Input type="number" required={field.required} id={field.title} />
+        </WithErrorMessage>
+      );
+
+    case "boolean":
+      return (
+        <WithErrorMessage errorMessage={field.errorMessage}>
+          <LabelWithRequired
+            htmlFor={field.title}
+            required={field.required || false}
+          >
+            {field.title}
+          </LabelWithRequired>
+          <Checkbox
+            defaultChecked={field.default as boolean}
+            required={field.required}
+            id={field.title}
+          />
+        </WithErrorMessage>
+      );
+
+    case "object":
+      return (
+        <div>
+          <h2>
+            {field.title}{" "}
+            {field.required && <RequiredIndicator required={field.required} />}
+          </h2>
+          {Object.entries(field.properties).map(([key, subField]) => (
+            <div key={key} className="mb-4">
+              <AutoField field={subField} />
+            </div>
+          ))}
+        </div>
+      );
+
+    case "array":
+      return <ArrayFieldRenderer field={field} />;
+
+    default:
+      return <div>Unsupported field type: {field.type}</div>;
   }
-}
+};
 
-function toSerializable(
-  value: unknown,
-  seen: WeakSet<object> = new WeakSet<object>()
-): unknown {
-  if (value === null) return null;
+const WithErrorMessage = ({
+  children,
+  errorMessage,
+}: {
+  children: React.ReactNode;
+  errorMessage: z.infer<typeof FieldSchema>["errorMessage"];
+}) => (
+  <div className="flex flex-col gap-1">
+    {children}
+    {errorMessage && <span className="text-red-500">{errorMessage}</span>}
+  </div>
+);
 
-  if (typeof value === "function") {
-    return value.name ? `[Function ${value.name}]` : "[Function]";
-  }
+const LabelWithRequired = ({
+  required,
+  children,
+  ...props
+}: React.ComponentProps<typeof Label> & { required: boolean }) => (
+  <Label className="flex items-center gap-1" {...props}>
+    {children}
+    {required && <RequiredIndicator required={required} />}
+  </Label>
+);
 
-  if (typeof value !== "object") {
-    return value;
-  }
+const RequiredIndicator = ({ required }: { required: boolean }) =>
+  required ? <span className="text-red-500">*</span> : null;
 
-  const objectValue = value as Record<string, unknown>;
+type ArrayField = Extract<z.infer<typeof FieldSchema>, { type: "array" }>;
 
-  if (seen.has(objectValue)) {
-    return "[Circular]";
-  }
-  seen.add(objectValue);
+const ArrayFieldRenderer = ({ field }: { field: ArrayField }) => {
+  const [items, setItems] = useState<
+    Array<{ id: number; defaultValue: unknown }>
+  >(() =>
+    Array.isArray(field.default)
+      ? field.default.map((value, index) => ({
+          id: index,
+          defaultValue: value,
+        }))
+      : []
+  );
 
-  if (Array.isArray(value)) {
-    return value.map((item) => toSerializable(item, seen));
-  }
+  const addItem = () => {
+    setItems((prev) => {
+      const nextId = prev.reduce((max, item) => Math.max(max, item.id), -1) + 1;
+      return [...prev, { id: nextId, defaultValue: undefined }];
+    });
+  };
 
-  const result: Record<string, unknown> = {};
+  const removeItem = (id: number) => {
+    setItems((prev) => prev.filter((item) => item.id !== id));
+  };
 
-  for (const [key, val] of Object.entries(objectValue)) {
-    if (key === "ref") continue;
+  return (
+    <WithErrorMessage errorMessage={field.errorMessage}>
+      <LabelWithRequired
+        htmlFor={field.title}
+        required={field.required || false}
+      >
+        {field.title}
+      </LabelWithRequired>
 
-    if (key === "_f" && val && typeof val === "object") {
-      const withoutRef = { ...(val as Record<string, unknown>) };
-      delete withoutRef.ref;
-      result[key] = toSerializable(withoutRef, seen);
-      continue;
-    }
+      <div className="flex flex-col gap-3">
+        {items.map((item) => {
+          const itemField = {
+            ...field.itemType,
+            default:
+              item.defaultValue ??
+              (field.itemType as { default?: unknown }).default,
+          } as z.infer<typeof FieldSchema>;
 
-    result[key] = toSerializable(val, seen);
-  }
+          return (
+            <div key={item.id} className="flex gap-2">
+              <div className="flex-1">
+                <AutoField field={itemField} showTitle={false} />
+              </div>
+              <Button
+                type="button"
+                onClick={() => removeItem(item.id)}
+                variant={"destructive"}
+                className="mt-auto"
+              >
+                Remove
+              </Button>
+            </div>
+          );
+        })}
 
-  return result;
-}
+        {items.length === 0 && (
+          <span className="text-sm text-muted-foreground">
+            No items yet. Use "Add item" to create one.
+          </span>
+        )}
+      </div>
 
-function normalizeAnyOfValues(values: unknown): unknown {
-  if (values == null || typeof values !== "object") return values;
-
-  if (Array.isArray(values)) {
-    return values.map((v) => normalizeAnyOfValues(v));
-  }
-
-  const obj = values as Record<string, unknown>;
-
-  // Handle leaf anyOf container pattern: { __anyOf: [...], __anyOfIndex: "i" }
-  if ("__anyOf" in obj && Array.isArray(obj.__anyOf)) {
-    const idxRaw = obj.__anyOfIndex;
-    const idx =
-      typeof idxRaw === "string" ? parseInt(idxRaw, 10) : Number(idxRaw ?? 0);
-    const chosen = obj.__anyOf[idx] ?? obj.__anyOf[0];
-    return normalizeAnyOfValues(chosen);
-  }
-
-  // Recurse into children, and collapse nested anyOf values
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (k === "__anyOf" || k === "__anyOfIndex") continue;
-
-    // If child is an anyOf container rendered via AnyOfTabs, we expect
-    // a structure like v = { __anyOf: [...], __anyOfIndex: ... } or an object containing it.
-    out[k] = normalizeAnyOfValues(v);
-  }
-
-  // Special case: if this object contains only an __anyOf subobject under some key
-  // handled by recursion above, the child recursion will have collapsed it already.
-  return out;
-}
+      <Button type="button" onClick={addItem}>
+        Add item
+      </Button>
+    </WithErrorMessage>
+  );
+};
