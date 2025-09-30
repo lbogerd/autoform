@@ -95,7 +95,7 @@ export const RecordFieldSchema = BaseFieldSchema.extend({
   type: z.literal("record"),
   keyType: z.union([z.literal("string"), z.literal("number")]),
   valueType: z.lazy(() => FieldSchema),
-  default: z.record(z.union([z.string(), z.number()]), z.any()).optional(),
+  default: z.record(z.union([z.string(), z.number()]), z.unknown()).optional(),
 }) satisfies z.ZodType<RecordField>;
 
 export const FieldSchema: z.ZodType<Field> = z.union([
