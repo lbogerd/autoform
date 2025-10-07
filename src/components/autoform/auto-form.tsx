@@ -53,7 +53,12 @@ export const AutoField = ({
               {field.title}
             </LabelWithRequired>
           )}
-          <Input type="text" required={field.required} id={field.title} />
+          <Input
+            type="text"
+            required={field.required}
+            id={field.title}
+            data-testid={field.testId}
+          />
         </WithErrorMessage>
       );
 
@@ -66,18 +71,24 @@ export const AutoField = ({
           >
             {field.title}
           </LabelWithRequired>
-          <Input type="number" required={field.required} id={field.title} />
+          <Input
+            type="number"
+            required={field.required}
+            id={field.title}
+            data-testid={field.testId}
+          />
         </WithErrorMessage>
       );
 
     case "boolean":
       return (
-        <div>
+        <WithErrorMessage errorMessage={field.errorMessage}>
           <div className="flex items-center gap-2">
             <Checkbox
               defaultChecked={field.default as boolean}
               required={field.required}
               id={field.title}
+              data-testid={field.testId}
             />
             <LabelWithRequired
               htmlFor={field.title}
@@ -86,15 +97,12 @@ export const AutoField = ({
               {field.title}
             </LabelWithRequired>
           </div>
-          {field.errorMessage && (
-            <span className="text-red-500">{field.errorMessage}</span>
-          )}
-        </div>
+        </WithErrorMessage>
       );
 
     case "object":
       return (
-        <div>
+        <div data-testid={field.testId}>
           <h2>
             {field.title}{" "}
             {field.required && <RequiredIndicator required={field.required} />}
@@ -124,11 +132,13 @@ export const AutoField = ({
 const WithErrorMessage = ({
   children,
   errorMessage,
+  testId,
 }: {
   children: React.ReactNode;
   errorMessage: z.infer<typeof FieldSchema>["errorMessage"];
+  testId?: string;
 }) => (
-  <div className="flex flex-col gap-1.5">
+  <div className="flex flex-col gap-1.5" data-testid={testId}>
     {children}
     {errorMessage && <span className="text-red-500">{errorMessage}</span>}
   </div>
@@ -172,7 +182,7 @@ const ArrayField = ({ field }: { field: z.infer<typeof ArrayFieldSchema> }) => {
   };
 
   return (
-    <WithErrorMessage errorMessage={field.errorMessage}>
+    <WithErrorMessage errorMessage={field.errorMessage} testId={field.testId}>
       <LabelWithRequired
         htmlFor={field.title}
         required={field.required || false}
@@ -222,7 +232,7 @@ const ArrayField = ({ field }: { field: z.infer<typeof ArrayFieldSchema> }) => {
 
 const UnionField = ({ field }: { field: z.infer<typeof UnionFieldSchema> }) => {
   return (
-    <WithErrorMessage errorMessage={field.errorMessage}>
+    <WithErrorMessage errorMessage={field.errorMessage} testId={field.testId}>
       <Tabs defaultValue={field.anyOf[0]?.title}>
         <TabsList>
           {field.anyOf.map((option) => (
@@ -274,7 +284,7 @@ const RecordField = ({ field }: { field: RecordFieldType }) => {
   };
 
   return (
-    <WithErrorMessage errorMessage={field.errorMessage}>
+    <WithErrorMessage errorMessage={field.errorMessage} testId={field.testId}>
       <LabelWithRequired
         htmlFor={field.title}
         required={field.required || false}

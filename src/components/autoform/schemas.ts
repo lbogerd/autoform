@@ -6,6 +6,7 @@ export const BaseFieldSchema = z.object({
   errorMessage: z.string().optional(),
   required: z.boolean().default(false).optional(),
   nullable: z.boolean().default(false).optional(),
+  testId: z.string().optional(),
 });
 
 // PRIMITIVE TYPES
