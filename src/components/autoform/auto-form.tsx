@@ -13,9 +13,6 @@ import {
 } from "./schemas";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 
-// Helper type for record fields
-type RecordFieldType = z.infer<typeof RecordFieldSchema>;
-
 export const AutoForm = ({
   schema,
 }: {
@@ -254,7 +251,11 @@ const UnionField = ({ field }: { field: z.infer<typeof UnionFieldSchema> }) => {
   );
 };
 
-const RecordField = ({ field }: { field: RecordFieldType }) => {
+const RecordField = ({
+  field,
+}: {
+  field: z.infer<typeof RecordFieldSchema>;
+}) => {
   const [keyValuePairs, setKeyValuePairs] = useState<
     Array<{ id: number; key: string; value: unknown }>
   >(() =>
