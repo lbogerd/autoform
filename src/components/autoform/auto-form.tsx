@@ -169,6 +169,7 @@ const ArrayField = ({ field }: { field: z.infer<typeof ArrayFieldSchema> }) => {
 
   const addItem = () => {
     setItems((prev) => {
+      // find the next available id by getting the max current id and adding 1
       const nextId = prev.reduce((max, item) => Math.max(max, item.id), -1) + 1;
       return [...prev, { id: nextId, defaultValue: undefined }];
     });
@@ -191,6 +192,7 @@ const ArrayField = ({ field }: { field: z.infer<typeof ArrayFieldSchema> }) => {
         {items.map((item) => {
           const itemField = {
             ...field.itemType,
+            // override the default value with the item's defaultValue if present
             default:
               item.defaultValue ??
               (field.itemType as { default?: unknown }).default,
