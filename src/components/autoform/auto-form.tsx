@@ -12,6 +12,49 @@ import {
   RecordFieldSchema,
 } from "./schemas";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { DatePicker } from "../ui/date-picker";
+
+const parseDateValue = (value: unknown): Date | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? undefined : value;
+  }
+
+  if (typeof value === "string") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  }
+
+  return undefined;
+};
+
+const extractTimeValue = (value: unknown): string | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  if (value instanceof Date) {
+    return value.toTimeString().slice(0, 5);
+  }
+
+  if (typeof value === "string") {
+    if (value.includes("T")) {
+      const [, timePart] = value.split("T");
+      if (timePart) {
+        return timePart.slice(0, 5);
+      }
+    }
+
+    if (/^\d{2}:\d{2}/.test(value)) {
+      return value.slice(0, 5);
+    }
+  }
+
+  return undefined;
+};
 
 export const AutoForm = ({
   schema,
@@ -76,6 +119,101 @@ export const AutoField = ({
           />
         </WithErrorMessage>
       );
+
+    case "date": {
+      const controlId = `${field.title}-date`;
+      const labelId = showTitle ? `${controlId}-label` : undefined;
+      const defaultDate = parseDateValue(field.default);
+
+      return (
+        <WithErrorMessage errorMessage={field.errorMessage}>
+          {showTitle && (
+            <LabelWithRequired
+              id={labelId}
+              htmlFor={controlId}
+              required={field.required || false}
+            >
+              {field.title}
+            </LabelWithRequired>
+          )}
+          <DatePicker
+            id={controlId}
+            testId={field.testId}
+            ariaLabel={!showTitle ? field.title : undefined}
+            ariaLabelledBy={labelId}
+            required={field.required}
+            defaultValue={defaultDate}
+          />
+        </WithErrorMessage>
+      );
+    }
+
+    case "time": {
+      const controlId = field.title;
+
+      return (
+        <WithErrorMessage errorMessage={field.errorMessage}>
+          {showTitle && (
+            <LabelWithRequired
+              htmlFor={controlId}
+              required={field.required || false}
+            >
+              {field.title}
+            </LabelWithRequired>
+          )}
+          <Input
+            type="time"
+            required={field.required}
+            id={controlId}
+            data-testid={field.testId}
+            defaultValue={field.default as string | undefined}
+            aria-label={!showTitle ? field.title : undefined}
+          />
+        </WithErrorMessage>
+      );
+    }
+
+    case "datetime": {
+      const baseId = field.title;
+      const dateControlId = `${baseId}-date`;
+      const timeControlId = `${baseId}-time`;
+      const labelId = showTitle ? `${baseId}-label` : undefined;
+      const defaultDate = parseDateValue(field.default);
+      const defaultTime = extractTimeValue(field.default);
+
+      return (
+        <WithErrorMessage errorMessage={field.errorMessage}>
+          {showTitle && (
+            <LabelWithRequired
+              id={labelId}
+              htmlFor={dateControlId}
+              required={field.required || false}
+            >
+              {field.title}
+            </LabelWithRequired>
+          )}
+          <div className="flex flex-col gap-2 md:flex-row">
+            <DatePicker
+              id={dateControlId}
+              testId={field.testId ? `${field.testId}-date` : undefined}
+              ariaLabel={!showTitle ? `${field.title} date` : undefined}
+              ariaLabelledBy={labelId}
+              required={field.required}
+              defaultValue={defaultDate}
+            />
+            <Input
+              type="time"
+              required={field.required}
+              id={timeControlId}
+              data-testid={field.testId}
+              defaultValue={defaultTime}
+              aria-label={!showTitle ? `${field.title} time` : undefined}
+              aria-labelledby={showTitle ? labelId : undefined}
+            />
+          </div>
+        </WithErrorMessage>
+      );
+    }
 
     case "boolean":
       return (

@@ -60,6 +60,21 @@ interface RecordField extends BaseField {
   default?: Record<string | number, unknown>;
 }
 
+interface DateField extends BaseField {
+  type: "date";
+  default?: string | Date;
+}
+
+interface TimeField extends BaseField {
+  type: "time";
+  default?: string;
+}
+
+interface DateTimeField extends BaseField {
+  type: "datetime";
+  default?: string | Date;
+}
+
 type Field =
   | StringField
   | NumberField
@@ -67,7 +82,10 @@ type Field =
   | ArrayField
   | UnionField
   | ObjectField
-  | RecordField;
+  | RecordField
+  | DateField
+  | TimeField
+  | DateTimeField;
 
 export const ObjectFieldSchema = BaseFieldSchema.extend({
   type: z.literal("object"),
@@ -99,6 +117,21 @@ export const RecordFieldSchema = BaseFieldSchema.extend({
   default: z.record(z.union([z.string(), z.number()]), z.unknown()).optional(),
 }) satisfies z.ZodType<RecordField>;
 
+export const DateFieldSchema = BaseFieldSchema.extend({
+  type: z.literal("date"),
+  default: z.union([z.string(), z.date()]).optional(),
+}) satisfies z.ZodType<DateField>;
+
+export const TimeFieldSchema = BaseFieldSchema.extend({
+  type: z.literal("time"),
+  default: z.string().optional(),
+}) satisfies z.ZodType<TimeField>;
+
+export const DateTimeFieldSchema = BaseFieldSchema.extend({
+  type: z.literal("datetime"),
+  default: z.union([z.string(), z.date()]).optional(),
+}) satisfies z.ZodType<DateTimeField>;
+
 export const FieldSchema: z.ZodType<Field> = z.union([
   StringFieldSchema,
   NumberFieldSchema,
@@ -107,6 +140,9 @@ export const FieldSchema: z.ZodType<Field> = z.union([
   ArrayFieldSchema,
   UnionFieldSchema,
   RecordFieldSchema,
+  DateFieldSchema,
+  TimeFieldSchema,
+  DateTimeFieldSchema,
 ]);
 
 export const FormSchema = z.object({

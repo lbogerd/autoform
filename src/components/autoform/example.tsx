@@ -121,6 +121,27 @@ export const Example = () => {
                     title: "Value",
                   },
                 },
+                birthDate: {
+                  type: "date",
+                  title: "Birth Date",
+                  description: "Select your birth date",
+                  required: true,
+                  testId: "birth-date-picker",
+                },
+                preferredContactTime: {
+                  type: "time",
+                  title: "Preferred Contact Time",
+                  description: "Choose the best time to contact you",
+                  default: "09:00",
+                  testId: "preferred-time-input",
+                },
+                nextAppointment: {
+                  type: "datetime",
+                  title: "Next Appointment",
+                  description: "Schedule your next appointment",
+                  default: "2025-01-15T14:30",
+                  testId: "next-appointment-field",
+                },
               },
             } satisfies z.infer<typeof FormSchema>
           }

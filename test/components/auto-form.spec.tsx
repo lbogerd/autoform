@@ -219,6 +219,60 @@ describe("auto-form component suite", () => {
       ).toHaveAttribute("type", "number");
     });
 
+    test("renders date field with date picker control", () => {
+      const field = {
+        type: "date",
+        title: "Start Date",
+        required: true,
+        testId: "start-date-picker",
+      } satisfies z.infer<typeof FieldSchema>;
+
+      render(<AutoField field={field} />);
+
+      const trigger = screen.getByRole("button", { name: /start date/i });
+      expect(trigger).toHaveAttribute("data-testid", "start-date-picker");
+      expect(trigger).toHaveAttribute("aria-required", "true");
+      expect(trigger).toHaveTextContent(/select date/i);
+    });
+
+    test("renders time field with time input", () => {
+      const field = {
+        type: "time",
+        title: "Meeting time",
+        default: "09:30",
+        testId: "meeting-time-input",
+      } satisfies z.infer<typeof FieldSchema>;
+
+      render(<AutoField field={field} />);
+
+      const input = screen.getByLabelText(/meeting time/i);
+      expect(input).toHaveAttribute("type", "time");
+      expect(input).toHaveValue("09:30");
+      expect(input).toHaveAttribute("data-testid", "meeting-time-input");
+    });
+
+    test("renders datetime field with combined controls", () => {
+      const defaultValue = "2024-05-01T15:45";
+      const formattedDate = new Date(defaultValue).toLocaleDateString();
+      const field = {
+        type: "datetime",
+        title: "Appointment",
+        required: true,
+        default: defaultValue,
+        testId: "appointment-field",
+      } satisfies z.infer<typeof FieldSchema>;
+
+      render(<AutoField field={field} />);
+
+      const dateTrigger = screen.getByTestId("appointment-field-date");
+      expect(dateTrigger).toHaveTextContent(formattedDate);
+      expect(dateTrigger).toHaveAttribute("aria-required", "true");
+
+      const timeInput = screen.getByTestId("appointment-field");
+      expect(timeInput).toHaveValue("15:45");
+      expect(timeInput).toHaveAttribute("type", "time");
+    });
+
     test("renders record field with default entries and supports edits", async () => {
       const user = userEvent.setup();
       const field = {

@@ -10,21 +10,63 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
-export function DatePicker() {
+type DatePickerProps = {
+  id?: string;
+  defaultValue?: Date;
+  onChange?: (value: Date | undefined) => void;
+  required?: boolean;
+  placeholder?: string;
+  testId?: string;
+  ariaLabel?: string;
+  ariaLabelledBy?: string;
+  containerClassName?: string;
+  buttonClassName?: string;
+};
+
+export function DatePicker({
+  id,
+  defaultValue,
+  onChange,
+  required,
+  placeholder = "Select date",
+  testId,
+  ariaLabel,
+  ariaLabelledBy,
+  containerClassName,
+  buttonClassName,
+}: DatePickerProps) {
   const [open, setOpen] = React.useState(false);
-  const [date, setDate] = React.useState<Date | undefined>(undefined);
+  const [date, setDate] = React.useState<Date | undefined>(defaultValue);
+
+  React.useEffect(() => {
+    setDate(defaultValue);
+  }, [defaultValue]);
+
+  const handleSelect = (nextDate?: Date) => {
+    setDate(nextDate);
+    onChange?.(nextDate);
+    setOpen(false);
+  };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className={cn("flex flex-col gap-2", containerClassName)}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
-            id="date"
-            className="w-48 justify-between font-normal"
+            id={id}
+            data-testid={testId}
+            aria-label={ariaLabel}
+            aria-labelledby={ariaLabelledBy}
+            aria-required={required ? "true" : undefined}
+            className={cn(
+              "w-full justify-between font-normal",
+              buttonClassName
+            )}
           >
-            {date ? date.toLocaleDateString() : "Select date"}
+            {date ? date.toLocaleDateString() : placeholder}
             <ChevronDownIcon />
           </Button>
         </PopoverTrigger>
@@ -33,10 +75,7 @@ export function DatePicker() {
             mode="single"
             selected={date}
             captionLayout="dropdown"
-            onSelect={(date) => {
-              setDate(date);
-              setOpen(false);
-            }}
+            onSelect={handleSelect}
           />
         </PopoverContent>
       </Popover>
