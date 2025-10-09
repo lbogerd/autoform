@@ -181,9 +181,21 @@ describe("auto-form component suite", () => {
       <AutoForm schema={schema} onSubmit={handleSubmit} />
     );
 
-    await user.type(screen.getByLabelText(/start date/i), "2025-05-17");
-    await user.type(screen.getByLabelText(/start time/i), "14:45");
-    await user.type(screen.getByLabelText(/meeting time/i), "2025-05-17T14:45");
+  const startDateInput = screen.getByRole("textbox", { name: /start date/i });
+  fireEvent.change(startDateInput, { target: { value: "2025-05-17" } });
+
+    const startTimeInput = screen.getByLabelText(/start time/i);
+    await user.type(startTimeInput, "14:45");
+
+    const meetingDateInput = screen.getByRole("textbox", {
+      name: /meeting time/i,
+    });
+    fireEvent.change(meetingDateInput, { target: { value: "2025-05-17" } });
+
+    const meetingTimeInput = screen.getByLabelText(/meeting time/i, {
+      selector: "input[type='time']",
+    });
+    await user.type(meetingTimeInput, "14:45");
 
     const form = container.querySelector("form");
     fireEvent.submit(form!);
@@ -231,7 +243,7 @@ describe("auto-form component suite", () => {
     await user.click(screen.getByRole("tab", { name: /phone/i }));
     const methodContainer = screen.getByTestId("contact-method");
     await user.type(
-      within(methodContainer).getByLabelText(/phone/i),
+      within(methodContainer).getByRole("textbox", { name: /phone/i }),
       "5551234"
     );
 
