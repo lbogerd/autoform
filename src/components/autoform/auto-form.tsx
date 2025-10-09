@@ -39,6 +39,20 @@ const parseDateValue = (value: unknown): Date | undefined => {
   return undefined;
 };
 
+const formatDateForInput = (value: unknown): string => {
+  const date = parseDateValue(value);
+
+  if (!date) {
+    return "";
+  }
+
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
 const extractTimeValue = (value: unknown): string | undefined => {
   if (!value) {
     return undefined;
@@ -63,6 +77,12 @@ const extractTimeValue = (value: unknown): string | undefined => {
 
   return undefined;
 };
+
+const buildControlId = (name: string): string =>
+  `af-${name
+    .replace(/\[(\d+)\]/g, "-$1")
+    .replace(/[.\s]+/g, "-")
+    .replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 
 type AnyField = z.infer<typeof FieldSchema>;
 type FormValues = Record<string, unknown>;
@@ -129,12 +149,14 @@ const buildDefaultValue = (field: AnyField, override?: unknown): unknown => {
     case "boolean":
       return typeof fallback === "boolean" ? fallback : false;
     case "date":
-      return parseDateValue(fallback);
+      return typeof fallback === "string"
+        ? fallback
+        : formatDateForInput(fallback);
     case "datetime":
       return {
-        date: parseDateValue(fallback),
+        date: formatDateForInput(fallback),
         time: extractTimeValue(fallback) ?? "",
-      } satisfies { date?: Date; time?: string };
+      } satisfies { date: string; time: string };
     case "object": {
       const defaultObject =
         (fallback && typeof fallback === "object" && !Array.isArray(fallback)
@@ -146,15 +168,15 @@ const buildDefaultValue = (field: AnyField, override?: unknown): unknown => {
           acc[key] = buildDefaultValue(subField, defaultObject[key]);
           return acc;
         },
-        {},
+        {}
       );
     }
     case "array": {
       const source = Array.isArray(fallback)
         ? fallback
         : Array.isArray(field.default)
-          ? field.default
-          : [];
+        ? field.default
+        : [];
       return source.map((item) => buildDefaultValue(field.itemType, item));
     }
     case "record": {
@@ -170,7 +192,7 @@ const buildDefaultValue = (field: AnyField, override?: unknown): unknown => {
     }
     case "union": {
       const defaultOptions = field.anyOf.map((option) =>
-        buildDefaultValue(option),
+        buildDefaultValue(option)
       );
       const result: UnionOptionsValue = {
         selected: 0,
@@ -179,14 +201,14 @@ const buildDefaultValue = (field: AnyField, override?: unknown): unknown => {
 
       if (fallback !== undefined) {
         const matchedIndex = field.anyOf.findIndex((option) =>
-          isValueMatchingField(fallback, option),
+          isValueMatchingField(fallback, option)
         );
 
         if (matchedIndex >= 0) {
           result.selected = matchedIndex;
           result.options[matchedIndex] = buildDefaultValue(
             field.anyOf[matchedIndex],
-            fallback,
+            fallback
           );
         }
       }
@@ -199,7 +221,7 @@ const buildDefaultValue = (field: AnyField, override?: unknown): unknown => {
 };
 
 const buildDefaultValues = (
-  fields: Record<string, z.infer<typeof FieldSchema>>,
+  fields: Record<string, z.infer<typeof FieldSchema>>
 ): FormValues => {
   return Object.entries(fields).reduce<FormValues>((acc, [key, field]) => {
     acc[key] = buildDefaultValue(field);
@@ -207,11 +229,137 @@ const buildDefaultValues = (
   }, {});
 };
 
+const normalizeFieldValue = (field: AnyField, value: unknown): unknown => {
+  switch (field.type) {
+    case "object": {
+      const source =
+        value && typeof value === "object" && !Array.isArray(value)
+          ? (value as Record<string, unknown>)
+          : {};
+
+      return Object.entries(field.properties).reduce<Record<string, unknown>>(
+        (acc, [key, subField]) => {
+          acc[key] = normalizeFieldValue(subField, source[key]);
+          return acc;
+        },
+        {}
+      );
+    }
+    case "array": {
+      if (!Array.isArray(value)) {
+        return [];
+      }
+
+      return value.map((item) =>
+        normalizeFieldValue(field.itemType as AnyField, item)
+      );
+    }
+    case "record": {
+      if (!Array.isArray(value)) {
+        return {};
+      }
+
+      return value.reduce<Record<string, unknown>>((acc, entry) => {
+        if (!entry || typeof entry !== "object") {
+          return acc;
+        }
+
+        const rawKey = (entry as { key?: unknown }).key;
+        if (rawKey === undefined || rawKey === null || rawKey === "") {
+          return acc;
+        }
+
+        const normalizedKey =
+          field.keyType === "number" ? Number(rawKey) : String(rawKey);
+
+        if (field.keyType === "number" && Number.isNaN(normalizedKey)) {
+          return acc;
+        }
+
+        acc[String(normalizedKey)] = normalizeFieldValue(
+          field.valueType,
+          (entry as { value?: unknown }).value
+        );
+        return acc;
+      }, {});
+    }
+    case "union": {
+      if (!value || typeof value !== "object") {
+        return {
+          selected: 0,
+          options: field.anyOf.map((option) =>
+            normalizeFieldValue(option, undefined)
+          ),
+        } satisfies UnionOptionsValue;
+      }
+
+      const unionValue = value as UnionOptionsValue;
+      const selectedIndex = Number(
+        (unionValue as { selected?: unknown }).selected ?? 0
+      );
+
+      return {
+        selected: Number.isNaN(selectedIndex) ? 0 : selectedIndex,
+        options: field.anyOf.map((option, index) =>
+          normalizeFieldValue(option, unionValue.options?.[index])
+        ),
+      } satisfies UnionOptionsValue;
+    }
+    case "date": {
+      if (typeof value === "string") {
+        return value;
+      }
+
+      return formatDateForInput(value);
+    }
+    case "time": {
+      if (typeof value === "string") {
+        return value;
+      }
+
+      return extractTimeValue(value) ?? "";
+    }
+    case "datetime": {
+      if (!value || typeof value !== "object") {
+        return "";
+      }
+
+      const rawDate = (value as { date?: unknown }).date;
+      const rawTime = (value as { time?: unknown }).time;
+
+      const datePart =
+        typeof rawDate === "string" ? rawDate : formatDateForInput(rawDate);
+      const timePart =
+        typeof rawTime === "string" ? rawTime : extractTimeValue(rawTime) ?? "";
+
+      if (!datePart && !timePart) {
+        return "";
+      }
+
+      return timePart ? `${datePart}T${timePart}` : datePart;
+    }
+    default:
+      return value;
+  }
+};
+
+const normalizeFormValues = (
+  values: FormValues,
+  fields: Record<string, z.infer<typeof FieldSchema>>
+): Record<string, unknown> =>
+  Object.entries(fields).reduce<Record<string, unknown>>(
+    (acc, [key, field]) => {
+      acc[key] = normalizeFieldValue(field, values[key]);
+      return acc;
+    },
+    {}
+  );
+
 const createArrayItemDefault = (field: AnyField, override?: unknown) =>
   buildDefaultValue(field, override);
 
 const createRecordEntryDefault = (
-  field: z.infer<typeof RecordFieldSchema>,
+  field: z.infer<typeof RecordFieldSchema>
 ): { key: string; value: unknown } => ({
   key: "",
   value: buildDefaultValue(field.valueType),
@@ -225,7 +373,7 @@ type AutoFormProps = {
 export const AutoForm = ({ schema, onSubmit }: AutoFormProps) => {
   const defaultValues = useMemo(
     () => buildDefaultValues(schema.fields),
-    [schema.fields],
+    [schema.fields]
   );
   const form = useForm({
     defaultValues,
@@ -234,11 +382,13 @@ export const AutoForm = ({ schema, onSubmit }: AutoFormProps) => {
   });
 
   const handleSubmit = form.handleSubmit((values) => {
+    const normalizedValues = normalizeFormValues(values, schema.fields);
+
     if (onSubmit) {
-      onSubmit(values);
+      onSubmit(normalizedValues);
     } else {
       // Having a default side-effect keeps the form ergonomic without forcing consumers to provide a handler.
-      console.info("AutoForm submission", values);
+      console.info("AutoForm submission", normalizedValues);
     }
   });
 
@@ -274,12 +424,14 @@ export const AutoField = ({
     case "string":
     case "email":
     case "password":
-    case "url":
+    case "url": {
+      const controlId = buildControlId(name);
+
       return (
         <WithErrorMessage errorMessage={field.errorMessage}>
           {showTitle && (
             <LabelWithRequired
-              htmlFor={field.title}
+              htmlFor={controlId}
               required={field.required || false}
             >
               {field.title}
@@ -288,18 +440,21 @@ export const AutoField = ({
           <Input
             type={field.type === "string" ? "text" : field.type}
             required={field.required}
-            id={field.title}
+            id={controlId}
             data-testid={field.testId}
             {...register(name, { required: field.required })}
           />
         </WithErrorMessage>
       );
+    }
 
-    case "number":
+    case "number": {
+      const controlId = buildControlId(name);
+
       return (
         <WithErrorMessage errorMessage={field.errorMessage}>
           <LabelWithRequired
-            htmlFor={field.title}
+            htmlFor={controlId}
             required={field.required || false}
           >
             {field.title}
@@ -307,7 +462,7 @@ export const AutoField = ({
           <Input
             type="number"
             required={field.required}
-            id={field.title}
+            id={controlId}
             data-testid={field.testId}
             {...register(name, {
               required: field.required,
@@ -319,9 +474,10 @@ export const AutoField = ({
           />
         </WithErrorMessage>
       );
+    }
 
     case "date": {
-      const controlId = `${field.title}-date`;
+      const controlId = buildControlId(name);
       const labelId = showTitle ? `${controlId}-label` : undefined;
 
       return (
@@ -346,7 +502,10 @@ export const AutoField = ({
                 ariaLabel={!showTitle ? field.title : undefined}
                 ariaLabelledBy={labelId}
                 required={field.required}
-                defaultValue={parseDateValue(controllerField.value)}
+                value={(controllerField.value as string | undefined) ?? ""}
+                name={controllerField.name}
+                onBlur={controllerField.onBlur}
+                inputRef={controllerField.ref}
                 onChange={(value) => controllerField.onChange(value)}
               />
             )}
@@ -356,7 +515,7 @@ export const AutoField = ({
     }
 
     case "time": {
-      const controlId = field.title;
+      const controlId = buildControlId(name);
 
       return (
         <WithErrorMessage errorMessage={field.errorMessage}>
@@ -383,7 +542,7 @@ export const AutoField = ({
     }
 
     case "datetime": {
-      const baseId = field.title;
+      const baseId = buildControlId(name);
       const dateControlId = `${baseId}-date`;
       const timeControlId = `${baseId}-time`;
       const labelId = showTitle ? `${baseId}-label` : undefined;
@@ -411,7 +570,10 @@ export const AutoField = ({
                   ariaLabel={!showTitle ? `${field.title} date` : undefined}
                   ariaLabelledBy={labelId}
                   required={field.required}
-                  defaultValue={parseDateValue(controllerField.value)}
+                  value={(controllerField.value as string | undefined) ?? ""}
+                  name={controllerField.name}
+                  onBlur={controllerField.onBlur}
+                  inputRef={controllerField.ref}
                   onChange={(value) => controllerField.onChange(value)}
                 />
               )}
@@ -433,7 +595,7 @@ export const AutoField = ({
     }
 
     case "boolean": {
-      const controlId = field.title;
+      const controlId = buildControlId(name);
 
       return (
         <WithErrorMessage errorMessage={field.errorMessage}>
@@ -499,7 +661,7 @@ export const AutoField = ({
     default:
       console.error("Reached default case in AutoField with field:", field);
       throw new Error(
-        `Unsupported field type: ${(field as { type: string }).type}`,
+        `Unsupported field type: ${(field as { type: string }).type}`
       );
   }
 };
@@ -563,8 +725,8 @@ const ArrayField = ({ field, name }: ArrayFieldProps) => {
     if (Array.isArray(field.default) && field.default.length > 0) {
       replace(
         field.default.map((item) =>
-          createArrayItemDefault(field.itemType, item),
-        ),
+          createArrayItemDefault(field.itemType, item)
+        )
       );
     }
   }, [
@@ -581,10 +743,7 @@ const ArrayField = ({ field, name }: ArrayFieldProps) => {
 
   return (
     <WithErrorMessage errorMessage={field.errorMessage} testId={field.testId}>
-      <LabelWithRequired
-        htmlFor={field.title}
-        required={field.required || false}
-      >
+      <LabelWithRequired required={field.required || false}>
         {field.title}
       </LabelWithRequired>
 
@@ -682,47 +841,51 @@ const RecordField = ({ field, name }: RecordFieldProps) => {
 
   return (
     <WithErrorMessage errorMessage={field.errorMessage} testId={field.testId}>
-      <LabelWithRequired
-        htmlFor={field.title}
-        required={field.required || false}
-      >
+      <LabelWithRequired required={field.required || false}>
         {field.title}
       </LabelWithRequired>
 
       <div className="flex flex-col gap-1">
-        {keyValuePairs.map((pair, index) => (
-          <div key={pair.id} className="flex gap-2">
-            <div className="flex-1">
-              <Input
-                type={field.keyType === "number" ? "number" : "text"}
-                {...register(`${name}.${index}.key`, {
-                  setValueAs: (value) =>
-                    field.keyType === "number"
-                      ? value === "" || value === undefined
-                        ? ""
-                        : value
-                      : value,
-                })}
-                placeholder={field.keyType === "number" ? "Numeric key" : "Key"}
-              />
+        {keyValuePairs.map((pair, index) => {
+          const keyControlId = buildControlId(`${name}.${index}.key`);
+
+          return (
+            <div key={pair.id} className="flex gap-2">
+              <div className="flex-1 flex flex-col gap-1.5">
+                <Label htmlFor={keyControlId}>Key</Label>
+                <Input
+                  id={keyControlId}
+                  type={field.keyType === "number" ? "number" : "text"}
+                  {...register(`${name}.${index}.key`, {
+                    setValueAs: (value) =>
+                      field.keyType === "number"
+                        ? value === "" || value === undefined
+                          ? ""
+                          : value
+                        : value,
+                  })}
+                  placeholder={
+                    field.keyType === "number" ? "Numeric key" : "Key"
+                  }
+                />
+              </div>
+              <div className="flex-1">
+                <AutoField
+                  field={field.valueType}
+                  name={`${name}.${index}.value`}
+                />
+              </div>
+              <Button
+                type="button"
+                onClick={() => remove(index)}
+                variant="ghost"
+                className="mt-auto hover:bg-destructive/90 hover:text-white focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60"
+              >
+                Remove
+              </Button>
             </div>
-            <div className="flex-1">
-              <AutoField
-                field={field.valueType}
-                name={`${name}.${index}.value`}
-                showTitle={false}
-              />
-            </div>
-            <Button
-              type="button"
-              onClick={() => remove(index)}
-              variant="ghost"
-              className="mt-auto hover:bg-destructive/90 hover:text-white focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60"
-            >
-              Remove
-            </Button>
-          </div>
-        ))}
+          );
+        })}
 
         {keyValuePairs.length === 0 && (
           <span className="text-sm text-muted-foreground">
