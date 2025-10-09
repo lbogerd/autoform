@@ -268,10 +268,10 @@ describe("auto-form component suite", () => {
 
     const schema = {
       fields: {
-        metadata: {
+        extraData: {
           type: "record",
-          title: "Metadata",
-          testId: "metadata-field",
+          title: "Extra Data",
+          testId: "extra-data-field",
           keyType: "string",
           valueType: {
             type: "string",
@@ -287,10 +287,10 @@ describe("auto-form component suite", () => {
 
     await user.click(screen.getByRole("button", { name: /add entry/i }));
 
-    const metadataContainer = screen.getByTestId("metadata-field");
-    await user.type(within(metadataContainer).getByLabelText(/key/i), "role");
+    const extraDataContainer = screen.getByTestId("extra-data-field");
+    await user.type(within(extraDataContainer).getByLabelText(/key/i), "role");
     await user.type(
-      within(metadataContainer).getByLabelText(/value/i),
+      within(extraDataContainer).getByLabelText(/value/i),
       "admin"
     );
 
@@ -302,7 +302,7 @@ describe("auto-form component suite", () => {
     });
 
     expect(handleSubmit).toHaveBeenLastCalledWith({
-      metadata: { role: "admin" },
+      extraData: { role: "admin" },
     });
   });
 

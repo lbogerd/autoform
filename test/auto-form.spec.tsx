@@ -342,7 +342,7 @@ describe("auto-form component suite", () => {
       const user = userEvent.setup();
       const field = {
         type: "record",
-        title: "Metadata",
+        title: "Extra Data",
         required: true,
         keyType: "string",
         valueType: {
@@ -355,9 +355,9 @@ describe("auto-form component suite", () => {
         },
       } satisfies z.infer<typeof RecordFieldSchema>;
 
-      renderSingleField(field, "metadata");
+      renderSingleField(field, "extraData");
 
-      expect(screen.getByText(/metadata/i)).toBeInTheDocument();
+      expect(screen.getByText(/extra data/i)).toBeInTheDocument();
       expect(screen.getByDisplayValue("source")).toBeInTheDocument();
 
       const removeButtons = screen.getAllByRole("button", { name: /remove/i });
