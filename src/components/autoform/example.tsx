@@ -1,6 +1,6 @@
 import * as z from "zod";
 import { AutoForm } from "./auto-form";
-import type { FormSchema } from "./schemas";
+import type { FormSchema } from "../../lib/auto-form/schemas";
 
 export const Example = () => {
   return (

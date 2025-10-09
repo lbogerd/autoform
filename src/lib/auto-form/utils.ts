@@ -1,7 +1,4 @@
-import type {
-  FieldSchema,
-  RecordFieldSchema,
-} from "../components/autoform/schemas";
+import type { FieldSchema, RecordFieldSchema } from "./schemas";
 import type z from "zod";
 
 /**

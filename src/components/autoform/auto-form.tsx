@@ -20,14 +20,14 @@ import {
   FormSchema,
   RecordFieldSchema,
   UnionFieldSchema,
-} from "./schemas";
+} from "../../lib/auto-form/schemas";
 import {
   buildDefaultValues,
   normalizeFormValues,
   buildControlId,
   createArrayItemDefault,
   createRecordEntryDefault,
-} from "@/lib/auto-form";
+} from "../../lib/auto-form/utils";
 
 type AutoFormProps = {
   schema: z.infer<typeof FormSchema>;
