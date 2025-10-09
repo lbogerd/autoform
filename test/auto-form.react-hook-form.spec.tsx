@@ -11,8 +11,8 @@ import {
 import userEvent from "@testing-library/user-event";
 import { z } from "zod";
 
-import { AutoForm } from "../src/components/autoform/auto-form";
-import { FormSchema } from "../src/components/autoform/schemas";
+import { AutoForm } from "../src/components/auto-form/auto-form";
+import { FormSchema } from "../src/lib/auto-form/schemas";
 
 describe("auto-form component suite", () => {
   beforeAll(() => {

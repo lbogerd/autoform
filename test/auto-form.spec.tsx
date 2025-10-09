@@ -4,14 +4,14 @@ import userEvent from "@testing-library/user-event";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { z } from "zod";
 
-import { AutoForm } from "../src/components/autoform/auto-form";
+import { AutoForm } from "../src/components/auto-form/auto-form";
 import {
   ArrayFieldSchema,
   FieldSchema,
   FormSchema,
   RecordFieldSchema,
   UnionFieldSchema,
-} from "../src/components/autoform/schemas";
+} from "../src/lib/auto-form/schemas";
 
 const renderSingleField = (
   field: z.infer<typeof FieldSchema>,
