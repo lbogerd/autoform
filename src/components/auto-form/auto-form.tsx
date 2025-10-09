@@ -41,7 +41,7 @@ type AutoFormProps = {
  * @param schema - Zod-backed description of the form fields.
  * @param onSubmit - Optional callback invoked with normalized field values.
  */
-export const AutoForm = ({ schema, onSubmit }: AutoFormProps) => {
+export const AutoForm = ({ schema, onSubmit, children }: AutoFormProps) => {
   const defaultValues = useMemo(
     () => buildDefaultValues(schema.fields),
     [schema.fields]
@@ -65,7 +65,7 @@ export const AutoForm = ({ schema, onSubmit }: AutoFormProps) => {
 
   return (
     <FormProvider {...form}>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
         {schema.title && <h1>{schema.title}</h1>}
         {schema.description && <p>{schema.description}</p>}
         <div className="flex flex-col gap-4">
