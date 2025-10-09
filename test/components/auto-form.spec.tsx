@@ -108,6 +108,53 @@ describe("auto-form component suite", () => {
       expect(screen.getByText("*")).toBeInTheDocument();
     });
 
+    test("renders email field with proper input type", () => {
+      const field = {
+        type: "email",
+        title: "Email",
+        required: true,
+        testId: "email-input",
+      } satisfies z.infer<typeof FieldSchema>;
+
+      render(<AutoField field={field} />);
+
+      const emailInput = screen.getByLabelText(/email/i);
+      expect(emailInput).toHaveAttribute("type", "email");
+      expect(emailInput).toBeRequired();
+      expect(emailInput).toHaveAttribute("data-testid", "email-input");
+    });
+
+    test("renders password field masked by default", () => {
+      const field = {
+        type: "password",
+        title: "Password",
+        required: true,
+        errorMessage: "Password is required",
+        default: undefined as never,
+      } satisfies z.infer<typeof FieldSchema>;
+
+      render(<AutoField field={field} />);
+
+      const passwordInput = screen.getByLabelText(/password/i);
+      expect(passwordInput).toHaveAttribute("type", "password");
+      expect(passwordInput).toBeRequired();
+      expect(screen.getByText(/password is required/i)).toBeVisible();
+    });
+
+    test("renders url field with url input", () => {
+      const field = {
+        type: "url",
+        title: "Website",
+        testId: "url-input",
+      } satisfies z.infer<typeof FieldSchema>;
+
+      render(<AutoField field={field} />);
+
+      const urlInput = screen.getByLabelText(/website/i);
+      expect(urlInput).toHaveAttribute("type", "url");
+      expect(urlInput).toHaveAttribute("data-testid", "url-input");
+    });
+
     test("renders object field and nested properties", () => {
       const field = {
         type: "object",
@@ -331,14 +378,15 @@ describe("auto-form component suite", () => {
       expect(numericKeyInput).toHaveAttribute("type", "number");
     });
 
-    test("returns null for unsupported field types", () => {
+    test("throws for unsupported field types", () => {
       const field = {
         type: "mystery",
         title: "Mystery",
       } as unknown as z.infer<typeof FieldSchema>;
 
-      const { container } = render(<AutoField field={field} />);
-      expect(container.firstChild).toBeNull();
+      expect(() => render(<AutoField field={field} />)).toThrow(
+        /unsupported field type/i
+      );
     });
   });
 

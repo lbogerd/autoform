@@ -83,6 +83,9 @@ export const AutoField = ({
 }) => {
   switch (field.type) {
     case "string":
+    case "email":
+    case "password":
+    case "url":
       return (
         <WithErrorMessage errorMessage={field.errorMessage}>
           {showTitle && (
@@ -94,7 +97,7 @@ export const AutoField = ({
             </LabelWithRequired>
           )}
           <Input
-            type="text"
+            type={field.type === "string" ? "text" : field.type}
             required={field.required}
             id={field.title}
             data-testid={field.testId}
@@ -260,7 +263,10 @@ export const AutoField = ({
       return <RecordField field={field} />;
 
     default:
-      return null;
+      console.error("Reached default case in AutoField with field:", field);
+      throw new Error(
+        `Unsupported field type: ${(field as { type: string }).type}`
+      );
   }
 };
 

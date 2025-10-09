@@ -33,6 +33,30 @@ type StringField = z.infer<typeof StringFieldSchema>;
 type NumberField = z.infer<typeof NumberFieldSchema>;
 type BooleanField = z.infer<typeof BooleanFieldSchema>;
 
+// PRIMITIVE SUBTYPES (like email, password etc)
+export const EmailFieldSchema = StringFieldSchema.extend({
+  type: z.literal("email"),
+  default: z.email().optional(),
+  enum: z.array(z.email()).optional(),
+});
+
+export const PasswordFieldSchema = StringFieldSchema.extend({
+  type: z.literal("password"),
+  default: z.never(),
+  enum: z.array(z.string()).optional(),
+});
+
+export const UrlFieldSchema = StringFieldSchema.extend({
+  type: z.literal("url"),
+  default: z.url().optional(),
+  enum: z.array(z.url()).optional(),
+});
+
+type EmailField = z.infer<typeof EmailFieldSchema>;
+type PasswordField = z.infer<typeof PasswordFieldSchema>;
+type UrlField = z.infer<typeof UrlFieldSchema>;
+
+// COMPLEX TYPES
 interface ObjectField extends BaseField {
   type: "object";
   properties: Record<string, Field>;
@@ -79,6 +103,9 @@ type Field =
   | StringField
   | NumberField
   | BooleanField
+  | EmailField
+  | PasswordField
+  | UrlField
   | ArrayField
   | UnionField
   | ObjectField
@@ -136,6 +163,9 @@ export const FieldSchema: z.ZodType<Field> = z.union([
   StringFieldSchema,
   NumberFieldSchema,
   BooleanFieldSchema,
+  EmailFieldSchema,
+  PasswordFieldSchema,
+  UrlFieldSchema,
   ObjectFieldSchema,
   ArrayFieldSchema,
   UnionFieldSchema,
