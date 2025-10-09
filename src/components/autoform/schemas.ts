@@ -118,7 +118,7 @@ export const ObjectFieldSchema = BaseFieldSchema.extend({
   type: z.literal("object"),
   properties: z.record(
     z.string(),
-    z.lazy(() => FieldSchema)
+    z.lazy(() => FieldSchema),
   ),
   isRequired: z.boolean().optional(),
   errorMessages: z.record(z.string(), z.string()).optional(),

@@ -63,7 +63,7 @@ export function DatePicker({
             aria-required={required ? "true" : undefined}
             className={cn(
               "w-full justify-between font-normal",
-              buttonClassName
+              buttonClassName,
             )}
           >
             {date ? date.toLocaleDateString() : placeholder}

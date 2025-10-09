@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 type RenderBaseContext<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 > = {
   id: string;
   name: TName;
@@ -23,14 +23,14 @@ type RenderBaseContext<
 
 type RenderContext<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 > = RenderBaseContext<TFieldValues, TName> & {
   icon: ReactNode | null;
 };
 
 type IconProp<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 > =
   | null
   | false
@@ -39,7 +39,7 @@ type IconProp<
 
 export type ValidationMessageProps<
   TFieldValues extends FieldValues = FieldValues,
-  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>
+  TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>,
 > = React.HTMLAttributes<HTMLDivElement> & {
   name: TName;
   id?: string;
@@ -47,7 +47,7 @@ export type ValidationMessageProps<
   render?: (context: RenderContext<TFieldValues, TName>) => ReactNode;
   transformMessages?: (
     messages: string[],
-    context: RenderBaseContext<TFieldValues, TName>
+    context: RenderBaseContext<TFieldValues, TName>,
   ) => string[];
 };
 
@@ -138,7 +138,7 @@ export const ValidationMessage = forwardRef<
         isDirty ||
         formState.isSubmitted ||
         formState.submitCount > 0 ||
-        isManualError)
+        isManualError),
   );
 
   if (!shouldDisplay) {
@@ -146,7 +146,7 @@ export const ValidationMessage = forwardRef<
   }
 
   const messages = collectErrorMessages(
-    error as FieldError | FieldErrorsImpl<FieldValues>
+    error as FieldError | FieldErrorsImpl<FieldValues>,
   );
 
   if (messages.length === 0) {
@@ -180,8 +180,8 @@ export const ValidationMessage = forwardRef<
     icon === false || icon === null
       ? null
       : typeof icon === "function"
-      ? icon(baseContext)
-      : icon ?? <AlertCircle className="size-4" aria-hidden="true" />;
+        ? icon(baseContext)
+        : (icon ?? <AlertCircle className="size-4" aria-hidden="true" />);
 
   const renderContext: RenderContext = {
     ...baseContext,
@@ -202,7 +202,7 @@ export const ValidationMessage = forwardRef<
       data-slot="validation-message"
       className={cn(
         "mt-1 flex items-start gap-2 text-sm text-destructive",
-        className
+        className,
       )}
       {...rest}
     >
