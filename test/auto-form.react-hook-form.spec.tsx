@@ -181,8 +181,8 @@ describe("auto-form component suite", () => {
       <AutoForm schema={schema} onSubmit={handleSubmit} />
     );
 
-  const startDateInput = screen.getByRole("textbox", { name: /start date/i });
-  fireEvent.change(startDateInput, { target: { value: "2025-05-17" } });
+    const startDateInput = screen.getByRole("textbox", { name: /start date/i });
+    fireEvent.change(startDateInput, { target: { value: "2025-05-17" } });
 
     const startTimeInput = screen.getByLabelText(/start time/i);
     await user.type(startTimeInput, "14:45");
