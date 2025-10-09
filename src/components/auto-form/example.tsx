@@ -1,6 +1,7 @@
 import * as z from "zod";
 import { AutoForm } from "./auto-form";
 import { fromJsonSchema } from "@/lib/auto-form/from-json-schema";
+import { Button } from "../ui/button";
 
 const testSchema = z.object({
   firstName: z.string().default("").meta({
@@ -90,7 +91,14 @@ export const Example = () => {
   return (
     <>
       <div className="space-y-4 p-4 pb-12 max-w-xl m-auto">
-        <AutoForm schema={fromJsonSchema(asJson)} />
+        <AutoForm
+          schema={fromJsonSchema(asJson)}
+          onSubmit={(data) => alert(JSON.stringify(data, null, 2))}
+        >
+          <Button type="submit" className="mt-4">
+            Submit
+          </Button>
+        </AutoForm>
       </div>
     </>
   );

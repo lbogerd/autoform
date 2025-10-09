@@ -32,6 +32,7 @@ import {
 type AutoFormProps = {
   schema: z.infer<typeof FormSchema>;
   onSubmit?: (values: Record<string, unknown>) => void;
+  children?: React.ReactNode;
 };
 
 /**
@@ -72,6 +73,8 @@ export const AutoForm = ({ schema, onSubmit }: AutoFormProps) => {
             <AutoField key={key} field={field} name={key} />
           ))}
         </div>
+
+        {children}
       </form>
     </FormProvider>
   );
