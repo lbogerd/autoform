@@ -255,6 +255,11 @@ export const buildDefaultValues = (
  *
  * The normalization mirrors `buildDefaultValue`, ensuring deeply nested structures are
  * consistent regardless of how the user interacted with the UI.
+ *
+ * Example transformations include:
+ * - Converting date objects to strings
+ * - Flattening union selections into their chosen option
+ * - Ensuring records are plain objects instead of arrays of entries
  */
 const normalizeFieldValue = (field: AnyField, value: unknown): unknown => {
   switch (field.type) {
@@ -372,6 +377,8 @@ const normalizeFieldValue = (field: AnyField, value: unknown): unknown => {
 
 /**
  * Normalizes an entire form submission payload based on the schema definitions.
+ *
+ * Example: converting date objects to strings, flattening union selections, etc.
  */
 export const normalizeFormValues = (
   values: FormValues,
