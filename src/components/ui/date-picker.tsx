@@ -14,8 +14,11 @@ import { cn } from "@/lib/utils";
 
 type DatePickerProps = {
   id?: string;
-  defaultValue?: Date;
-  onChange?: (value: Date | undefined) => void;
+  value?: string;
+  name?: string;
+  onChange?: (value: string) => void;
+  onBlur?: () => void;
+  inputRef?: React.Ref<HTMLInputElement>;
   required?: boolean;
   placeholder?: string;
   testId?: string;
@@ -27,8 +30,11 @@ type DatePickerProps = {
 
 export function DatePicker({
   id,
-  defaultValue,
+  value,
+  name,
   onChange,
+  onBlur,
+  inputRef,
   required,
   placeholder = "Select date",
   testId,
@@ -38,42 +44,88 @@ export function DatePicker({
   buttonClassName,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false);
-  const [date, setDate] = React.useState<Date | undefined>(defaultValue);
+  const [inputValue, setInputValue] = React.useState(value ?? "");
+
+  const parsedDate = React.useMemo(() => {
+    if (!inputValue) {
+      return undefined;
+    }
+
+    const nextDate = new Date(inputValue);
+    return Number.isNaN(nextDate.getTime()) ? undefined : nextDate;
+  }, [inputValue]);
 
   React.useEffect(() => {
-    setDate(defaultValue);
-  }, [defaultValue]);
+    setInputValue(value ?? "");
+  }, [value]);
+
+  const formatDate = React.useCallback((date?: Date) => {
+    if (!date) {
+      return "";
+    }
+
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, "0");
+    const day = `${date.getDate()}`.padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }, []);
 
   const handleSelect = (nextDate?: Date) => {
-    setDate(nextDate);
-    onChange?.(nextDate);
+    const nextValue = formatDate(nextDate);
+    setInputValue(nextValue);
+    onChange?.(nextValue);
     setOpen(false);
   };
 
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextValue = event.target.value;
+    setInputValue(nextValue);
+    onChange?.(nextValue);
+  };
+
+  const triggerId = id ? `${id}-trigger` : undefined;
+
   return (
     <div className={cn("flex flex-col gap-2", containerClassName)}>
+      <input
+        ref={inputRef}
+        id={id}
+        name={name}
+        type="text"
+        inputMode="numeric"
+        value={inputValue}
+        onChange={handleInputChange}
+        onBlur={onBlur}
+        onFocus={() => setOpen(true)}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
+        required={required}
+        data-testid={testId ? `${testId}-input` : undefined}
+        className="sr-only"
+      />
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
-            id={id}
+            id={triggerId}
             data-testid={testId}
             aria-label={ariaLabel}
             aria-labelledby={ariaLabelledBy}
             aria-required={required ? "true" : undefined}
             className={cn(
               "w-full justify-between font-normal",
-              buttonClassName,
+              buttonClassName
             )}
           >
-            {date ? date.toLocaleDateString() : placeholder}
+            {parsedDate ? parsedDate.toLocaleDateString() : placeholder}
             <ChevronDownIcon />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto overflow-hidden p-0" align="start">
           <Calendar
             mode="single"
-            selected={date}
+            selected={parsedDate}
             captionLayout="dropdown"
             onSelect={handleSelect}
           />

@@ -4,18 +4,18 @@ import userEvent from "@testing-library/user-event";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { z } from "zod";
 
-import { AutoForm } from "../../src/components/autoform/auto-form";
+import { AutoForm } from "../src/components/autoform/auto-form";
 import {
   ArrayFieldSchema,
   FieldSchema,
   FormSchema,
   RecordFieldSchema,
   UnionFieldSchema,
-} from "../../src/components/autoform/schemas";
+} from "../src/components/autoform/schemas";
 
 const renderSingleField = (
   field: z.infer<typeof FieldSchema>,
-  fieldKey = "field",
+  fieldKey = "field"
 ) => {
   const schema = {
     fields: { [fieldKey]: field },
@@ -32,7 +32,7 @@ describe("auto-form component suite", () => {
         observe() {}
         unobserve() {}
         disconnect() {}
-      },
+      }
     );
   });
 
@@ -61,10 +61,10 @@ describe("auto-form component suite", () => {
       render(<AutoForm schema={schema} />);
 
       expect(
-        screen.getByRole("heading", { level: 1, name: /user profile/i }),
+        screen.getByRole("heading", { level: 1, name: /user profile/i })
       ).toBeInTheDocument();
       expect(
-        screen.getByText(/provide basic account details/i),
+        screen.getByText(/provide basic account details/i)
       ).toBeInTheDocument();
       expect(screen.getByLabelText(/full name/i)).toBeRequired();
       const ageInput = screen.getByLabelText(/age/i);
@@ -183,7 +183,7 @@ describe("auto-form component suite", () => {
       renderSingleField(field, "address");
 
       expect(
-        screen.getByRole("heading", { level: 2, name: /address \*/i }),
+        screen.getByRole("heading", { level: 2, name: /address \*/i })
       ).toBeInTheDocument();
       expect(screen.getByLabelText(/street/i)).toBeRequired();
     });
@@ -206,20 +206,20 @@ describe("auto-form component suite", () => {
       const container = screen.getByTestId("array-field");
       expect(container).toBeInTheDocument();
       expect(
-        screen.getByText(/no items yet\. use "add item" to create one\./i),
+        screen.getByText(/no items yet\. use "add item" to create one\./i)
       ).toBeVisible();
 
       await user.click(screen.getByRole("button", { name: /add item/i }));
 
       expect(
-        screen.queryByText(/no items yet\. use "add item" to create one\./i),
+        screen.queryByText(/no items yet\. use "add item" to create one\./i)
       ).not.toBeInTheDocument();
       expect(screen.getByRole("textbox")).toBeInTheDocument();
       expect(screen.queryByText("Hobby")).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: /remove/i }));
       expect(
-        screen.getByText(/no items yet\. use "add item" to create one\./i),
+        screen.getByText(/no items yet\. use "add item" to create one\./i)
       ).toBeVisible();
     });
 
@@ -247,8 +247,8 @@ describe("auto-form component suite", () => {
 
       await waitFor(() =>
         expect(screen.getAllByRole("button", { name: /remove/i }).length).toBe(
-          1,
-        ),
+          1
+        )
       );
     });
 
@@ -274,13 +274,13 @@ describe("auto-form component suite", () => {
       renderSingleField(field, "contactPreference");
 
       expect(
-        screen.getByRole("textbox", { name: /email/i }),
+        screen.getByRole("textbox", { name: /email/i })
       ).toBeInTheDocument();
       const phoneTab = screen.getByRole("tab", { name: /phone/i });
       await user.click(phoneTab);
 
       expect(
-        screen.getByRole("spinbutton", { name: /phone/i }),
+        screen.getByRole("spinbutton", { name: /phone/i })
       ).toHaveAttribute("type", "number");
     });
 
@@ -403,7 +403,7 @@ describe("auto-form component suite", () => {
       } as unknown as z.infer<typeof FieldSchema>;
 
       expect(() => renderSingleField(field, "mystery")).toThrow(
-        /unsupported field type/i,
+        /unsupported field type/i
       );
     });
   });
