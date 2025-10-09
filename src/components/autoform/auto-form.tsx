@@ -568,6 +568,7 @@ const RecordField = ({ field, name }: RecordFieldProps) => {
                 <AutoField
                   field={field.valueType}
                   name={`${name}.${index}.value`}
+                  showTitle={true}
                 />
               </div>
               <Button
