@@ -1,10 +1,10 @@
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { z } from "zod";
 
-import { AutoField, AutoForm } from "../../src/components/autoform/auto-form";
+import { AutoForm } from "../../src/components/autoform/auto-form";
 import {
   ArrayFieldSchema,
   FieldSchema,
@@ -12,6 +12,17 @@ import {
   RecordFieldSchema,
   UnionFieldSchema,
 } from "../../src/components/autoform/schemas";
+
+const renderSingleField = (
+  field: z.infer<typeof FieldSchema>,
+  fieldKey = "field",
+) => {
+  const schema = {
+    fields: { [fieldKey]: field },
+  } satisfies z.infer<typeof FormSchema>;
+
+  return render(<AutoForm schema={schema} />);
+};
 
 describe("auto-form component suite", () => {
   beforeAll(() => {
@@ -21,7 +32,7 @@ describe("auto-form component suite", () => {
         observe() {}
         unobserve() {}
         disconnect() {}
-      }
+      },
     );
   });
 
@@ -50,10 +61,10 @@ describe("auto-form component suite", () => {
       render(<AutoForm schema={schema} />);
 
       expect(
-        screen.getByRole("heading", { level: 1, name: /user profile/i })
+        screen.getByRole("heading", { level: 1, name: /user profile/i }),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(/provide basic account details/i)
+        screen.getByText(/provide basic account details/i),
       ).toBeInTheDocument();
       expect(screen.getByLabelText(/full name/i)).toBeRequired();
       const ageInput = screen.getByLabelText(/age/i);
@@ -71,7 +82,7 @@ describe("auto-form component suite", () => {
         errorMessage: "First name is required",
       } satisfies z.infer<typeof FieldSchema>;
 
-      render(<AutoField field={field} />);
+      renderSingleField(field, "firstName");
 
       const input = screen.getByLabelText(/first name/i);
       expect(input).toBeRequired();
@@ -85,7 +96,7 @@ describe("auto-form component suite", () => {
         title: "Years of experience",
       } satisfies z.infer<typeof FieldSchema>;
 
-      const { container } = render(<AutoField field={field} />);
+      const { container } = renderSingleField(field, "experience");
 
       const numberInput = screen.getByLabelText("Years of experience");
       expect(numberInput).toHaveAttribute("type", "number");
@@ -100,7 +111,7 @@ describe("auto-form component suite", () => {
         required: true,
       } satisfies z.infer<typeof FieldSchema>;
 
-      render(<AutoField field={field} />);
+      renderSingleField(field, "acceptTerms");
 
       const checkbox = screen.getByRole("checkbox", { name: /accept terms/i });
       expect(checkbox).toBeChecked();
@@ -116,7 +127,7 @@ describe("auto-form component suite", () => {
         testId: "email-input",
       } satisfies z.infer<typeof FieldSchema>;
 
-      render(<AutoField field={field} />);
+      renderSingleField(field, "email");
 
       const emailInput = screen.getByLabelText(/email/i);
       expect(emailInput).toHaveAttribute("type", "email");
@@ -133,7 +144,7 @@ describe("auto-form component suite", () => {
         default: undefined as never,
       } satisfies z.infer<typeof FieldSchema>;
 
-      render(<AutoField field={field} />);
+      renderSingleField(field, "password");
 
       const passwordInput = screen.getByLabelText(/password/i);
       expect(passwordInput).toHaveAttribute("type", "password");
@@ -148,7 +159,7 @@ describe("auto-form component suite", () => {
         testId: "url-input",
       } satisfies z.infer<typeof FieldSchema>;
 
-      render(<AutoField field={field} />);
+      renderSingleField(field, "website");
 
       const urlInput = screen.getByLabelText(/website/i);
       expect(urlInput).toHaveAttribute("type", "url");
@@ -169,10 +180,10 @@ describe("auto-form component suite", () => {
         },
       } satisfies z.infer<typeof FieldSchema>;
 
-      render(<AutoField field={field} />);
+      renderSingleField(field, "address");
 
       expect(
-        screen.getByRole("heading", { level: 2, name: /address \*/i })
+        screen.getByRole("heading", { level: 2, name: /address \*/i }),
       ).toBeInTheDocument();
       expect(screen.getByLabelText(/street/i)).toBeRequired();
     });
@@ -190,25 +201,25 @@ describe("auto-form component suite", () => {
         },
       } satisfies z.infer<typeof ArrayFieldSchema>;
 
-      render(<AutoField field={field} />);
+      renderSingleField(field, "hobbies");
 
       const container = screen.getByTestId("array-field");
       expect(container).toBeInTheDocument();
       expect(
-        screen.getByText(/no items yet\. use "add item" to create one\./i)
+        screen.getByText(/no items yet\. use "add item" to create one\./i),
       ).toBeVisible();
 
       await user.click(screen.getByRole("button", { name: /add item/i }));
 
       expect(
-        screen.queryByText(/no items yet\. use "add item" to create one\./i)
+        screen.queryByText(/no items yet\. use "add item" to create one\./i),
       ).not.toBeInTheDocument();
       expect(screen.getByRole("textbox")).toBeInTheDocument();
       expect(screen.queryByText("Hobby")).not.toBeInTheDocument();
 
       await user.click(screen.getByRole("button", { name: /remove/i }));
       expect(
-        screen.getByText(/no items yet\. use "add item" to create one\./i)
+        screen.getByText(/no items yet\. use "add item" to create one\./i),
       ).toBeVisible();
     });
 
@@ -224,14 +235,21 @@ describe("auto-form component suite", () => {
         default: [7],
       } satisfies z.infer<typeof ArrayFieldSchema>;
 
-      render(<AutoField field={field} />);
+      renderSingleField(field, "luckyNumbers");
 
-      expect(screen.getAllByRole("button", { name: /remove/i }).length).toBe(1);
+      const initialRemoveButtons = await screen.findAllByRole("button", {
+        name: /remove/i,
+      });
+      expect(initialRemoveButtons.length).toBe(1);
 
       await user.click(screen.getByRole("button", { name: /add item/i }));
       await user.click(screen.getAllByRole("button", { name: /remove/i })[0]);
 
-      expect(screen.getAllByRole("button", { name: /remove/i }).length).toBe(1);
+      await waitFor(() =>
+        expect(screen.getAllByRole("button", { name: /remove/i }).length).toBe(
+          1,
+        ),
+      );
     });
 
     test("renders union field with tab switching", async () => {
@@ -253,16 +271,16 @@ describe("auto-form component suite", () => {
         ],
       } satisfies z.infer<typeof UnionFieldSchema>;
 
-      render(<AutoField field={field} />);
+      renderSingleField(field, "contactPreference");
 
       expect(
-        screen.getByRole("textbox", { name: /email/i })
+        screen.getByRole("textbox", { name: /email/i }),
       ).toBeInTheDocument();
       const phoneTab = screen.getByRole("tab", { name: /phone/i });
       await user.click(phoneTab);
 
       expect(
-        screen.getByRole("spinbutton", { name: /phone/i })
+        screen.getByRole("spinbutton", { name: /phone/i }),
       ).toHaveAttribute("type", "number");
     });
 
@@ -274,7 +292,7 @@ describe("auto-form component suite", () => {
         testId: "start-date-picker",
       } satisfies z.infer<typeof FieldSchema>;
 
-      render(<AutoField field={field} />);
+      renderSingleField(field, "startDate");
 
       const trigger = screen.getByRole("button", { name: /start date/i });
       expect(trigger).toHaveAttribute("data-testid", "start-date-picker");
@@ -290,7 +308,7 @@ describe("auto-form component suite", () => {
         testId: "meeting-time-input",
       } satisfies z.infer<typeof FieldSchema>;
 
-      render(<AutoField field={field} />);
+      renderSingleField(field, "meetingTime");
 
       const input = screen.getByLabelText(/meeting time/i);
       expect(input).toHaveAttribute("type", "time");
@@ -309,7 +327,7 @@ describe("auto-form component suite", () => {
         testId: "appointment-field",
       } satisfies z.infer<typeof FieldSchema>;
 
-      render(<AutoField field={field} />);
+      renderSingleField(field, "appointment");
 
       const dateTrigger = screen.getByTestId("appointment-field-date");
       expect(dateTrigger).toHaveTextContent(formattedDate);
@@ -337,7 +355,7 @@ describe("auto-form component suite", () => {
         },
       } satisfies z.infer<typeof RecordFieldSchema>;
 
-      render(<AutoField field={field} />);
+      renderSingleField(field, "metadata");
 
       expect(screen.getByText(/metadata/i)).toBeInTheDocument();
       expect(screen.getByDisplayValue("source")).toBeInTheDocument();
@@ -372,7 +390,7 @@ describe("auto-form component suite", () => {
         },
       } satisfies z.infer<typeof RecordFieldSchema>;
 
-      render(<AutoField field={field} />);
+      renderSingleField(field, "thresholds");
 
       const numericKeyInput = screen.getByDisplayValue("1");
       expect(numericKeyInput).toHaveAttribute("type", "number");
@@ -384,8 +402,8 @@ describe("auto-form component suite", () => {
         title: "Mystery",
       } as unknown as z.infer<typeof FieldSchema>;
 
-      expect(() => render(<AutoField field={field} />)).toThrow(
-        /unsupported field type/i
+      expect(() => renderSingleField(field, "mystery")).toThrow(
+        /unsupported field type/i,
       );
     });
   });
@@ -397,7 +415,7 @@ describe("auto-form component suite", () => {
         title: "Nickname",
       } satisfies z.infer<typeof FieldSchema>;
 
-      const { container } = render(<AutoField field={field} />);
+      const { container } = renderSingleField(field, "nickname");
 
       expect(screen.getByLabelText(/nickname/i)).toBeInTheDocument();
       expect(container.querySelector("span.text-red-500")).toBeNull();
