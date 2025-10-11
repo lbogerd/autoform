@@ -1,79 +1,12 @@
 import type { FieldSchema, RecordFieldSchema } from "./schemas";
 import type z from "zod";
+import { extractTimeValue, formatDateForInput } from "./date-helpers";
+import { normalizeValue } from "./normalizers";
+import { validateFormValues } from "./validation";
+import type { AnyField, UnionOptionsValue } from "./normalizers/types";
 
-/**
- * Attempts to coerce an arbitrary value into a valid {@link Date} instance.
- *
- * @param value - Raw value coming from default values, form state, or schema.
- * @returns A {@link Date} when the value can be interpreted as one, otherwise `undefined`.
- */
-export const parseDateValue = (value: unknown): Date | undefined => {
-  if (!value) {
-    return undefined;
-  }
-
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? undefined : value;
-  }
-
-  if (typeof value === "string") {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? undefined : date;
-  }
-
-  return undefined;
-};
-
-/**
- * Normalizes a date-like value into the `YYYY-MM-DD` string used by native date inputs.
- *
- * @param value - Any value that might represent a date (string, Date, etc.).
- * @returns A formatted date string or an empty string when the value is not a valid date.
- */
-export const formatDateForInput = (value: unknown): string => {
-  const date = parseDateValue(value);
-
-  if (!date) {
-    return "";
-  }
-
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, "0");
-  const day = `${date.getDate()}`.padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-};
-
-/**
- * Extracts the `HH:MM` portion from time-like values so they can be consumed by time inputs.
- *
- * @param value - A string or {@link Date} potentially containing a time component.
- * @returns The first five characters of the time component or `undefined` if unavailable.
- */
-export const extractTimeValue = (value: unknown): string | undefined => {
-  if (!value) {
-    return undefined;
-  }
-
-  if (value instanceof Date) {
-    return value.toTimeString().slice(0, 5);
-  }
-
-  if (typeof value === "string") {
-    if (value.includes("T")) {
-      const [, timePart] = value.split("T");
-      if (timePart) {
-        return timePart.slice(0, 5);
-      }
-    }
-
-    if (/^\d{2}:\d{2}/.test(value)) {
-      return value.slice(0, 5);
-    }
-  }
-
-  return undefined;
-};
+export { parseDateValue } from "./date-helpers";
+export { validateFormValues } from "./validation";
 
 /**
  * Builds a stable, DOM-safe identifier for a given React Hook Form field name.
@@ -87,13 +20,7 @@ export const buildControlId = (name: string): string =>
     .replace(/[.\s]+/g, "-")
     .replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 
-type AnyField = z.infer<typeof FieldSchema>;
 type FormValues = Record<string, unknown>;
-
-type UnionOptionsValue = {
-  selected: number;
-  options: unknown[];
-};
 
 /**
  * Determines whether a provided value structurally matches the expected field definition.
@@ -258,119 +185,8 @@ export const buildDefaultValues = (
  * - Flattening union selections into their chosen option
  * - Ensuring records are plain objects instead of arrays of entries
  */
-const normalizeFieldValue = (field: AnyField, value: unknown): unknown => {
-  switch (field.type) {
-    case "object": {
-      const source =
-        value && typeof value === "object" && !Array.isArray(value)
-          ? (value as Record<string, unknown>)
-          : {};
-
-      return Object.entries(field.properties).reduce<Record<string, unknown>>(
-        (acc, [key, subField]) => {
-          acc[key] = normalizeFieldValue(subField, source[key]);
-          return acc;
-        },
-        {}
-      );
-    }
-    case "array": {
-      if (!Array.isArray(value)) {
-        return [];
-      }
-
-      return value.map((item) =>
-        normalizeFieldValue(field.itemType as AnyField, item)
-      );
-    }
-    case "record": {
-      if (!Array.isArray(value)) {
-        return {};
-      }
-
-      return value.reduce<Record<string, unknown>>((acc, entry) => {
-        if (!entry || typeof entry !== "object") {
-          return acc;
-        }
-
-        const rawKey = (entry as { key?: unknown }).key;
-        if (rawKey === undefined || rawKey === null || rawKey === "") {
-          return acc;
-        }
-
-        const normalizedKey =
-          field.keyType === "number" ? Number(rawKey) : String(rawKey);
-
-        if (field.keyType === "number" && Number.isNaN(normalizedKey)) {
-          return acc;
-        }
-
-        acc[String(normalizedKey)] = normalizeFieldValue(
-          field.valueType,
-          (entry as { value?: unknown }).value
-        );
-        return acc;
-      }, {});
-    }
-    case "union": {
-      if (!value || typeof value !== "object") {
-        return {
-          selected: 0,
-          options: field.anyOf.map((option) =>
-            normalizeFieldValue(option, undefined)
-          ),
-        } satisfies UnionOptionsValue;
-      }
-
-      const unionValue = value as UnionOptionsValue;
-      const selectedIndex = Number(
-        (unionValue as { selected?: unknown }).selected ?? 0
-      );
-
-      return {
-        selected: Number.isNaN(selectedIndex) ? 0 : selectedIndex,
-        options: field.anyOf.map((option, index) =>
-          normalizeFieldValue(option, unionValue.options?.[index])
-        ),
-      } satisfies UnionOptionsValue;
-    }
-    case "date": {
-      if (typeof value === "string") {
-        return value;
-      }
-
-      return formatDateForInput(value);
-    }
-    case "time": {
-      if (typeof value === "string") {
-        return value;
-      }
-
-      return extractTimeValue(value) ?? "";
-    }
-    case "datetime": {
-      if (!value || typeof value !== "object") {
-        return "";
-      }
-
-      const rawDate = (value as { date?: unknown }).date;
-      const rawTime = (value as { time?: unknown }).time;
-
-      const datePart =
-        typeof rawDate === "string" ? rawDate : formatDateForInput(rawDate);
-      const timePart =
-        typeof rawTime === "string" ? rawTime : extractTimeValue(rawTime) ?? "";
-
-      if (!datePart && !timePart) {
-        return "";
-      }
-
-      return timePart ? `${datePart}T${timePart}` : datePart;
-    }
-    default:
-      return value;
-  }
-};
+const normalizeFieldValue = (field: AnyField, value: unknown): unknown =>
+  normalizeValue(field, value);
 
 /**
  * Normalizes an entire form submission payload based on the schema definitions.

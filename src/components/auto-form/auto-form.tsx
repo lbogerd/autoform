@@ -24,6 +24,7 @@ import {
 import {
   buildDefaultValues,
   normalizeFormValues,
+  validateFormValues,
   buildControlId,
   createArrayItemDefault,
   createRecordEntryDefault,
@@ -52,8 +53,21 @@ export const AutoForm = ({ schema, onSubmit, children }: AutoFormProps) => {
     shouldUnregister: false,
   });
 
-  const handleSubmit = form.handleSubmit((values) => {
+  const submitWithValidation = form.handleSubmit((values) => {
     const normalizedValues = normalizeFormValues(values, schema.fields);
+
+    const issues = validateFormValues(normalizedValues, schema.fields);
+
+    if (issues.length > 0) {
+      issues.forEach((issue) => {
+        const fieldName = issue.path.join(".");
+        form.setError(fieldName as never, {
+          type: "manual",
+          message: issue.message,
+        });
+      });
+      return;
+    }
 
     if (onSubmit) {
       onSubmit(normalizedValues);
@@ -62,6 +76,11 @@ export const AutoForm = ({ schema, onSubmit, children }: AutoFormProps) => {
       console.info("AutoForm submission", normalizedValues);
     }
   });
+
+  const handleSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
+    form.clearErrors();
+    return submitWithValidation(event);
+  };
 
   return (
     <FormProvider {...form}>
@@ -106,7 +125,7 @@ export const AutoField = ({
       const controlId = buildControlId(name);
 
       return (
-        <WithErrorMessage errorMessage={field.errorMessage}>
+        <WithErrorMessage name={name} errorMessage={field.errorMessage}>
           {showTitle && (
             <LabelWithRequired
               htmlFor={controlId}
@@ -130,7 +149,7 @@ export const AutoField = ({
       const controlId = buildControlId(name);
 
       return (
-        <WithErrorMessage errorMessage={field.errorMessage}>
+        <WithErrorMessage name={name} errorMessage={field.errorMessage}>
           <LabelWithRequired
             htmlFor={controlId}
             required={field.required || false}
@@ -159,7 +178,7 @@ export const AutoField = ({
       const labelId = showTitle ? `${controlId}-label` : undefined;
 
       return (
-        <WithErrorMessage errorMessage={field.errorMessage}>
+        <WithErrorMessage name={name} errorMessage={field.errorMessage}>
           {showTitle && (
             <LabelWithRequired
               id={labelId}
@@ -196,7 +215,7 @@ export const AutoField = ({
       const controlId = buildControlId(name);
 
       return (
-        <WithErrorMessage errorMessage={field.errorMessage}>
+        <WithErrorMessage name={name} errorMessage={field.errorMessage}>
           {showTitle && (
             <LabelWithRequired
               htmlFor={controlId}
@@ -226,7 +245,7 @@ export const AutoField = ({
       const labelId = showTitle ? `${baseId}-label` : undefined;
 
       return (
-        <WithErrorMessage errorMessage={field.errorMessage}>
+        <WithErrorMessage name={name} errorMessage={field.errorMessage}>
           {showTitle && (
             <LabelWithRequired
               id={labelId}
@@ -276,7 +295,7 @@ export const AutoField = ({
       const controlId = buildControlId(name);
 
       return (
-        <WithErrorMessage errorMessage={field.errorMessage}>
+        <WithErrorMessage name={name} errorMessage={field.errorMessage}>
           <div className="flex items-center gap-2">
             <Controller
               name={name}
@@ -347,7 +366,45 @@ export const AutoField = ({
 type WithErrorMessageProps = {
   children: React.ReactNode;
   errorMessage: z.infer<typeof FieldSchema>["errorMessage"];
+  name?: string;
   testId?: string;
+};
+
+const getErrorMessageForField = (
+  errors: Record<string, unknown>,
+  name?: string
+): string | undefined => {
+  if (!name) {
+    return undefined;
+  }
+
+  const segments = name.split(".");
+  let current: unknown = errors;
+
+  for (const segment of segments) {
+    if (!current || typeof current !== "object") {
+      return undefined;
+    }
+
+    if (Array.isArray(current)) {
+      const index = Number(segment);
+      if (Number.isNaN(index)) {
+        return undefined;
+      }
+
+      current = current[index];
+      continue;
+    }
+
+    current = (current as Record<string, unknown>)[segment];
+  }
+
+  if (!current || typeof current !== "object") {
+    return undefined;
+  }
+
+  const message = (current as { message?: unknown }).message;
+  return typeof message === "string" ? message : undefined;
 };
 
 /**
@@ -356,13 +413,23 @@ type WithErrorMessageProps = {
 const WithErrorMessage = ({
   children,
   errorMessage,
+  name,
   testId,
-}: WithErrorMessageProps) => (
-  <div className="flex flex-col gap-1.5" data-testid={testId}>
-    {children}
-    {errorMessage && <span className="text-red-500">{errorMessage}</span>}
-  </div>
-);
+}: WithErrorMessageProps) => {
+  const { formState } = useFormContext();
+  const resolvedMessage =
+    getErrorMessageForField(formState.errors as Record<string, unknown>, name) ??
+    errorMessage;
+
+  return (
+    <div className="flex flex-col gap-1.5" data-testid={testId}>
+      {children}
+      {resolvedMessage && (
+        <span className="text-red-500">{resolvedMessage}</span>
+      )}
+    </div>
+  );
+};
 
 /**
  * Combines a standard label with an optional required indicator.
@@ -433,7 +500,11 @@ const ArrayField = ({ field, name }: ArrayFieldProps) => {
   };
 
   return (
-    <WithErrorMessage errorMessage={field.errorMessage} testId={field.testId}>
+    <WithErrorMessage
+      name={name}
+      errorMessage={field.errorMessage}
+      testId={field.testId}
+    >
       <LabelWithRequired required={field.required || false}>
         {field.title}
       </LabelWithRequired>
@@ -488,9 +559,14 @@ const UnionField = ({ field, name, setValue, watch }: UnionFieldProps) => {
   const activeIndex =
     typeof selectedIndex === "number" ? selectedIndex : Number(selectedIndex);
   const tabValue = activeIndex.toString();
+  const activeErrorPath = `${name}.options.${activeIndex}`;
 
   return (
-    <WithErrorMessage errorMessage={field.errorMessage} testId={field.testId}>
+    <WithErrorMessage
+      name={activeErrorPath}
+      errorMessage={field.errorMessage}
+      testId={field.testId}
+    >
       <Tabs
         defaultValue={tabValue}
         value={tabValue}
@@ -538,7 +614,11 @@ const RecordField = ({ field, name }: RecordFieldProps) => {
   };
 
   return (
-    <WithErrorMessage errorMessage={field.errorMessage} testId={field.testId}>
+    <WithErrorMessage
+      name={name}
+      errorMessage={field.errorMessage}
+      testId={field.testId}
+    >
       <LabelWithRequired required={field.required || false}>
         {field.title}
       </LabelWithRequired>
