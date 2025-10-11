@@ -333,4 +333,42 @@ describe("auto-form component suite", () => {
 
     expect(handleSubmit).not.toHaveBeenCalled();
   });
+
+  test("prevents submit when required arrays are empty", async () => {
+    const user = userEvent.setup();
+    const handleSubmit = vi.fn();
+
+    const schema = {
+      fields: {
+        tags: {
+          type: "array",
+          title: "Tags",
+          required: true,
+          errorMessage: "Add at least one tag",
+          itemType: { type: "string", title: "Tag" },
+        },
+      },
+    } satisfies z.infer<typeof FormSchema>;
+
+    const { container } = render(
+      <AutoForm schema={schema} onSubmit={handleSubmit} />
+    );
+
+    const form = container.querySelector("form");
+    fireEvent.submit(form!);
+
+    await waitFor(() => {
+      expect(handleSubmit).not.toHaveBeenCalled();
+    });
+
+    await user.click(screen.getByRole("button", { name: /add item/i }));
+    const tagInput = screen.getByRole("textbox");
+    await user.type(tagInput, "remote");
+
+    fireEvent.submit(form!);
+
+    await waitFor(() => {
+      expect(handleSubmit).toHaveBeenCalledTimes(1);
+    });
+  });
 });
