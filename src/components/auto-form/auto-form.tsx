@@ -87,11 +87,6 @@ export function AutoForm<T extends z.ZodType>({
         }
 
         <Button type="submit">Submit</Button>
-
-        {/* Debug */}
-        <div className="font-mono text-xs mt-4 p-2 bg-gray-100">
-          {JSON.stringify(methods.watch(), null, 2)}
-        </div>
       </form>
     </FormProvider>
   );
